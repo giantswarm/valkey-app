@@ -1,0 +1,11 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: add release v0.8.1
+      sha: bce9499be2c7779513a26c5b10aaca7bdb87d647
+      tags:
+      - v0.8.1
+    path: .
+  path: helm/valkey/charts/valkey
+kind: LockConfig

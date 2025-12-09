@@ -1,0 +1,45 @@
+# This file is a Helm values file for the valkey chart.
+#
+# To learn more about how to configure your app on your cluster
+# and override the default values in here, visit:
+#
+#   https://docs.giantswarm.io/tutorials/fleet-management/app-platform/app-configuration/#basic-values-merging-example
+#
+
+valkey:
+  # Configuration for the Valkey image
+  image:
+    # Use Giant Swarm's container registry
+    registry: gsoci.azurecr.io
+    repository: giantswarm/valkey
+
+  # Enable metrics for monitoring
+  metrics:
+    enabled: true
+    exporter:
+      image:
+        registry: gsoci.azurecr.io
+        repository: giantswarm/redis_exporter
+    # Enable PodMonitor for Prometheus scraping
+    podMonitor:
+      enabled: true
+      additionalLabels:
+        application.giantswarm.io/team: planeteers
+
+  # Resource limits/requests for Valkey
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+ciliumNetworkPolicy:
+  enabled: true
+
+vpa:
+  enabled: true
+  containerPolicies:
+    minAllowed:
+      cpu: "50m"

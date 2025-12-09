@@ -1,0 +1,6 @@
+dependencies:
+- name: valkey
+  repository: file://charts/valkey
+  version: 0.8.1
+digest: sha256:73f09412f296b12aa64f12831d3f485f93115181a66433363222d53f1769f90d
+generated: "2025-12-09T23:49:04.747795668+01:00"

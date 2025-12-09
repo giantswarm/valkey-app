@@ -1,0 +1,26 @@
+{{- if .Capabilities.APIVersions.Has "autoscaling.k8s.io/v1" -}}
+{{- if .Values.vpa.enabled -}}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ include "name" . }}-vpa
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: 'valkey'
+    {{- if .Values.vpa.containerPolicies }}
+      {{- with .Values.vpa.containerPolicies -}}
+        {{ tpl (toYaml .) $ | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       {{ .Release.Name }}-valkey
+  updatePolicy:
+    updateMode: Auto
+{{- end -}}
+{{- end -}}
+
