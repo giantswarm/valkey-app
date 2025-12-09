@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
+## [0.1.0] - 2025-12-09
 
-[Unreleased]: https://github.com/giantswarm/valkey-app/tree/main
+### Added
+
+- Initial release based on upstream valkey-helm chart v0.8.1.
+- Configure Giant Swarm container registry for images.
+- Add CiliumNetworkPolicy for network isolation.
+- Add VerticalPodAutoscaler (VPA) support.
+- Enable metrics and PodMonitor for Prometheus monitoring.
+
+[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/giantswarm/valkey-app/releases/tag/v0.1.0
