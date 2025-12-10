@@ -20,6 +20,22 @@ valkey:
       image:
         registry: gsoci.azurecr.io
         repository: giantswarm/redis_exporter
+      # Security context for metrics exporter container
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+      # Resource limits/requests for metrics exporter
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
     # Enable PodMonitor for Prometheus scraping
     podMonitor:
       enabled: true
@@ -34,6 +50,15 @@ valkey:
     requests:
       cpu: 100m
       memory: 128Mi
+
+  # Resource limits/requests for init container
+  initResources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
 
 ciliumNetworkPolicy:
   enabled: true

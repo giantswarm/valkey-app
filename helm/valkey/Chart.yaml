@@ -15,9 +15,8 @@ description: A Giant Swarm app for deploying Valkey (a Redis alternative) on Kub
 # URL of the GitHub repository that is the source of this Chart.yaml file.
 home: https://github.com/giantswarm/valkey-app
 
-# If you have an icon/logo, you should add it to https://github.com/giantswarm/web-assets
-# and set the final URL as a value here and uncomment.
-#icon: https://s.giantswarm.io/app-icons/valkey/1/light.svg
+# Using upstream Valkey icon
+icon: https://dyltqmyl993wv.cloudfront.net/assets/stacks/valkey/img/valkey-stack-220x234.png
 
 sources:
   - https://github.com/valkey-io/valkey-helm
