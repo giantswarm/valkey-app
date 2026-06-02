@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Change
+## [0.0.1] - 2026-06-02
+
+### Changed
 
 - Update icon URL in Chart.yaml to use Giant Swarm hosted SVG icon
 
@@ -35,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add VerticalPodAutoscaler (VPA) support.
 - Enable metrics and PodMonitor for Prometheus monitoring.
 
-[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/giantswarm/valkey-app/compare/v0.1.2...v0.0.1
 [0.1.2]: https://github.com/giantswarm/valkey-app/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/giantswarm/valkey-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/giantswarm/valkey-app/releases/tag/v0.1.0

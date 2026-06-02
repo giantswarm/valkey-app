@@ -2,24 +2,18 @@
 # for details and background.
 
 apiVersion: v2
-
 # Version of the packaged app
 appVersion: 8.1.4
-
 # Make sure your name DOES NOT end in "app" or "-app".
 name: valkey
-
 # Please describe what the app provides in a sentence or two.
 description: A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
-
 # URL of the GitHub repository that is the source of this Chart.yaml file.
 home: https://github.com/giantswarm/valkey-app
-
 icon: https://s.giantswarm.io/app-icons/valkey/1/light.svg
-
 sources:
   - https://github.com/valkey-io/valkey-helm
-version: 0.0.0-dev
+version: 0.0.1
 annotations:
   application.giantswarm.io/team: planeteers
   # Adapt to 'giantswarm' if this application is not to be deployed by customers
