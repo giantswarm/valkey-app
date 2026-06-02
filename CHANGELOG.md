@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.1] - 2026-06-02
 
-### Change
+### Changed
 
 - Update icon URL in Chart.yaml to use Giant Swarm hosted SVG icon
 
