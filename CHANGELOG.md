@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.2] - 2026-06-11
 
-###Changed
+### Changed
 
 - Use Giant Swarm hosted chart icon
 
