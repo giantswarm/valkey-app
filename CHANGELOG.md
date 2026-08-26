@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Authenticate the metrics exporter against Valkey when `auth.enabled` is
+  set: backport upstream valkey-helm's `REDIS_PASSWORD` wiring (default ACL
+  user's password from `usersExistingSecret`/`passwordKey`, or the chart's
+  generated `<fullname>-auth` Secret) into the vendored subchart's exporter
+  env. Without it every scrape failed with `NOAUTH Authentication required`
+  and the exporter served only `redis_up 0` stubs — invisible until v0.1.3
+  made the PodMonitor discoverable.
+
 ## [0.1.3] - 2026-08-26
 
 ### Fixed
