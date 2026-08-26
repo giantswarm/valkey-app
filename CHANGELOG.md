@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Make the PodMonitor discoverable by Giant Swarm's monitoring agent: the
+  default discovery label was set under `metrics.podMonitor.additionalLabels`,
+  a key the subchart documents but never renders (only `extraLabels` is
+  consumed), so the PodMonitor carried no discovery label and was silently
+  never scraped. Set `observability.giantswarm.io/tenant: giantswarm` under
+  `metrics.podMonitor.extraLabels` instead (replacing the never-rendered
+  `application.giantswarm.io/team: planeteers`, which was also stale — the
+  chart is owned by team bumblebee).
+
 ## [0.0.3] - 2026-06-15
 
 ### Changed
