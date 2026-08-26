@@ -39,8 +39,22 @@ valkey:
     # Enable PodMonitor for Prometheus scraping
     podMonitor:
       enabled: true
-      additionalLabels:
-        application.giantswarm.io/team: planeteers
+      # Labels for the PodMonitor resource. On Giant Swarm installations the
+      # monitoring agent (alloy-metrics) selects PodMonitors by a label on
+      # the PodMonitor *object*, with two alternatives (verified against
+      # alloy-metrics' rendered config on a live MC):
+      #
+      #   observability.giantswarm.io/tenant In [<tenant>]      -- current
+      #   application.giantswarm.io/team Exists                 -- "legacy",
+      #     and only when observability.giantswarm.io/tenant is absent
+      #
+      # A PodMonitor matching neither selector is created and silently never
+      # scraped. These labels must live under `extraLabels`: the subchart's
+      # podmonitor.yaml renders only `extraLabels`, while its
+      # `additionalLabels` key is documented in the subchart values but never
+      # consumed by any template.
+      extraLabels:
+        observability.giantswarm.io/tenant: giantswarm
 
   # Resource limits/requests for Valkey
   resources:
