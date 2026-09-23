@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The metrics exporter image is back on `v1.91.1`, the newest tag the gsoci
+  mirror `giantswarm/redis_exporter` carries. 0.1.5 released Renovate's bump to
+  `v1.92.0` (#74), which does not exist there: every Valkey pod that rolled onto
+  0.1.5 came up with its `metrics` sidecar in `ImagePullBackOff`, never Ready,
+  and the `Recreate` deployments (muster's store) lost their only pod, so muster
+  refused every authenticated call until the rollback. A bump of the exporter
+  tag needs the mirror first.
+
 ## [0.1.5] - 2026-09-23
 
 ### Fixed
