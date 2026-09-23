@@ -10,7 +10,7 @@
     // Repo-owned overrides -- last entry, so its rules win over the presets.
     // Renovate resolves this from the default branch on every run: edits are
     // live on merge, no regeneration needed.
-    'github>giantswarm/valkey-app-79:renovate-custom.json5',
+    'github>giantswarm/valkey-app:renovate-custom.json5',
   ],
   // Two of our own bots commit onto Renovate branches. taylorbot
   // <dev@giantswarm.io> pushes what the generated workflows produce
