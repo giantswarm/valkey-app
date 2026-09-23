@@ -1,0 +1,146 @@
+# Credential checksum tests for the valkey chart
+#
+# The init container reads the users' passwords once, from the rendered
+# <fullname>-auth Secret and from auth.usersExistingSecret, and the metrics
+# exporter reads the default user's password from the same Secret at start.
+# The pod template's annotations restart the pod when they change:
+# checksum/auth-secret is the SHA-256 of the rendered Secret's data lines
+# ("<user>-password: <base64>", "aclConfig: <base64>", one per line, no
+# trailing newline), checksum/users-secret is auth.usersExistingSecretChecksum
+# verbatim, the mark whoever rotates the existing Secret changes with it. The
+# pinned hash is the SHA-256 of
+#   admin-password: YWRtaW4tcGFzc3dvcmQ=\nreadonly-password: cmVhZG9ubHktcGFzc3dvcmQ=
+suite: credential checksums
+templates:
+  - templates/deploy_valkey.yaml
+  - templates/init_config.yaml
+tests:
+  - it: should carry no credential checksum when auth is disabled, and the config checksums as annotations
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/users-secret"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/initconfig"]
+      - notExists:
+          path: spec.template.metadata.labels["checksum/initconfig"]
+
+  - it: should hash the rendered Secret's data for inline passwords
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.aclUsers:
+        admin:
+          permissions: "~* &* +@all"
+          password: "admin-password"
+        readonly:
+          permissions: "~* +@read"
+          password: "readonly-password"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+          value: 680b3f77bf896fab3b539eda3ac8d5d54f3fe0ab24f9e64731584148ed9ae18d
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/users-secret"]
+
+  - it: should change the hash when a password is rotated
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.aclUsers:
+        admin:
+          permissions: "~* &* +@all"
+          password: "admin-password"
+        readonly:
+          permissions: "~* +@read"
+          password: "rotated-password"
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+          pattern: ^[0-9a-f]{64}$
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+          value: 680b3f77bf896fab3b539eda3ac8d5d54f3fe0ab24f9e64731584148ed9ae18d
+
+  - it: should hash the rendered Secret for an inline ACL configuration
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.aclConfig: "user admin on >password ~* &* +@all"
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+          pattern: ^[0-9a-f]{64}$
+
+  - it: should render the existing Secret's mark verbatim
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.usersExistingSecret: "my-valkey-users"
+      auth.usersExistingSecretChecksum: "rotation-2"
+      auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/users-secret"]
+          value: rotation-2
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+
+  - it: should carry no mark for an existing Secret without one
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.usersExistingSecret: "my-valkey-users"
+      auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/users-secret"]
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+
+  - it: should carry both checksums with an existing Secret and inline passwords
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.usersExistingSecret: "my-valkey-users"
+      auth.usersExistingSecretChecksum: "rotation-2"
+      auth.aclUsers:
+        admin:
+          permissions: "~* &* +@all"
+          password: "admin-password"
+        readonly:
+          permissions: "~* +@read"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/users-secret"]
+          value: rotation-2
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+          pattern: ^[0-9a-f]{64}$
+
+  - it: should keep podAnnotations beside the checksums
+    template: templates/deploy_valkey.yaml
+    set:
+      auth.enabled: true
+      auth.aclUsers:
+        admin:
+          permissions: "~* &* +@all"
+          password: "admin-password"
+      podAnnotations:
+        karpenter.sh/do-not-disrupt: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["karpenter.sh/do-not-disrupt"]
+          value: "true"
+      - exists:
+          path: spec.template.metadata.annotations["checksum/auth-secret"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/initconfig"]

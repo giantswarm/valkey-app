@@ -25,13 +25,16 @@
                 "aclConfig": {
                     "type": "string"
                 },
-                "aclUsers" : {
+                "aclUsers": {
                     "type": "object"
                 },
                 "enabled": {
                     "type": "boolean"
                 },
                 "usersExistingSecret": {
+                    "type": "string"
+                },
+                "usersExistingSecretChecksum": {
                     "type": "string"
                 }
             }
@@ -76,7 +79,10 @@
         },
         "deploymentStrategy": {
             "type": "string",
-             "enum": ["RollingUpdate", "Recreate"]
+            "enum": [
+                "RollingUpdate",
+                "Recreate"
+            ]
         },
         "env": {
             "type": "object"
@@ -424,7 +430,7 @@
                 },
                 "requireClientCertificate": {
                     "type": "boolean"
-                }               
+                }
             }
         },
         "tolerations": {

@@ -25,13 +25,16 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
         checksum/initconfig: {{ include (print $.Template.BasePath "/init_config.yaml") . | sha256sum | trunc 32 }}
         {{- if .Values.valkeyConfig }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 32 }}
+        {{- end }}
+        {{- with include "valkey.authChecksums" . }}
+        {{- . | nindent 8 }}
         {{- end }}
     spec:
       {{ (include "valkey.imagePullSecrets" .) | nindent 6 }}
@@ -76,7 +79,7 @@ spec:
               mountPath: /valkey-users-secret
               readOnly: true
             {{- end }}
-            {{- if or (include "valkey.hasInlinePasswords" . | eq "true") .Values.auth.aclConfig }}
+            {{- if include "valkey.renderAuthSecret" . | eq "true" }}
             - name: valkey-auth-secret
               mountPath: /valkey-auth-secret
               readOnly: true
@@ -253,7 +256,7 @@ spec:
             secretName: {{ .Values.auth.usersExistingSecret }}
             defaultMode: 0400
         {{- end }}
-        {{- if or (include "valkey.hasInlinePasswords" . | eq "true") .Values.auth.aclConfig }}
+        {{- if include "valkey.renderAuthSecret" . | eq "true" }}
         - name: valkey-auth-secret
           secret:
             secretName: {{ include "valkey.fullname" . }}-auth

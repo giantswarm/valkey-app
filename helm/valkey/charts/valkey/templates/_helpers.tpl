@@ -154,3 +154,56 @@ Validate auth configuration
   {{- end }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Whether the chart renders the <fullname>-auth Secret: auth on with an inline
+password or an inline ACL configuration.
+*/}}
+{{- define "valkey.renderAuthSecret" -}}
+{{- if and .Values.auth.enabled (or (include "valkey.hasInlinePasswords" . | eq "true") .Values.auth.aclConfig) -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end -}}
+
+{{/*
+Data of the <fullname>-auth Secret the chart renders (templates/secret.yaml),
+one "key: base64" line per entry: the inline passwords and the inline ACL
+configuration. Its SHA-256 is the pod template's checksum/auth-secret
+annotation, so the pod rolls when one of them changes; the Secret template and
+the annotation share it so the two cannot drift.
+*/}}
+{{- define "valkey.authSecretData" -}}
+{{- $lines := list -}}
+{{- range $username, $user := .Values.auth.aclUsers -}}
+{{- if $user.password -}}
+{{- $lines = append $lines (printf "%s-password: %s" $username ($user.password | b64enc)) -}}
+{{- end -}}
+{{- end -}}
+{{- if .Values.auth.aclConfig -}}
+{{- $lines = append $lines (printf "aclConfig: %s" (.Values.auth.aclConfig | b64enc)) -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}
+
+{{/*
+The pod template's credential checksums, one "annotation: value" line each:
+the SHA-256 of the rendered <fullname>-auth Secret's data
+(checksum/auth-secret), and, for auth.usersExistingSecret, which the chart
+cannot read, auth.usersExistingSecretChecksum verbatim (checksum/users-secret)
+while it is set. Empty while auth is off, or while nothing marks the existing
+Secret's revision.
+*/}}
+{{- define "valkey.authChecksums" -}}
+{{- $lines := list -}}
+{{- if .Values.auth.enabled -}}
+{{- if include "valkey.renderAuthSecret" . | eq "true" -}}
+{{- $lines = append $lines (printf "checksum/auth-secret: %q" (include "valkey.authSecretData" . | sha256sum)) -}}
+{{- end -}}
+{{- if and .Values.auth.usersExistingSecret .Values.auth.usersExistingSecretChecksum -}}
+{{- $lines = append $lines (printf "checksum/users-secret: %q" .Values.auth.usersExistingSecretChecksum) -}}
+{{- end -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}
