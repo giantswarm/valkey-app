@@ -93,6 +93,8 @@ This app has been tested to work with the following workload cluster release ver
 - The metrics exporter authenticates against Valkey when `auth.enabled` is set (`REDIS_PASSWORD` from `usersExistingSecret`/`passwordKey` or the chart's `<fullname>-auth` Secret), backported from a later upstream version.
 - The pod template's `checksum/auth-secret` and `checksum/users-secret` annotations and the `auth.usersExistingSecretChecksum` value (upstream: [valkey-io/valkey-helm#128](https://github.com/valkey-io/valkey-helm/pull/128) covers the rendered Secret's half), and the pod annotations rendered as annotations also without `podAnnotations` (upstream `main` has this).
 
+The packaged form of the subchart (`helm/valkey/charts/*.tgz`) is not committed: `helm dependency build` recreates it locally when needed, and the chart renders and packages from the directory, so the two cannot disagree.
+
 `make helm-test` lints the chart and runs its unit tests (`helm/valkey/charts/valkey/tests/`); the `chart-test` CircleCI job runs it on every branch and tag.
 
 ## Limitations
