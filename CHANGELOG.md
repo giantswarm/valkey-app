@@ -7,17 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The packaged subchart `helm/valkey/charts/valkey-0.8.1.tgz` is no longer
+  committed (`.gitignore`); the vendored directory `helm/valkey/charts/valkey/`
+  is the one source the chart renders and packages from. Helm loaded both and
+  rendered the directory, so a tgz that lagged behind it (0.1.4 to 0.1.5) or
+  ran ahead of it (the 0.1.6 fix) said nothing about what shipped. `helm
+  package` ships the directory, `helm dependency build` still works, and the
+  rendered chart is byte-identical.
+
 ## [0.1.6] - 2026-09-23
 
-### Fixed
+### Changed
 
-- The metrics exporter image is back on `v1.91.1`, the newest tag the gsoci
-  mirror `giantswarm/redis_exporter` carries. 0.1.5 released Renovate's bump to
-  `v1.92.0` (#74), which does not exist there: every Valkey pod that rolled onto
-  0.1.5 came up with its `metrics` sidecar in `ImagePullBackOff`, never Ready,
-  and the `Recreate` deployments (muster's store) lost their only pod, so muster
-  refused every authenticated call until the rollback. A bump of the exporter
-  tag needs the mirror first.
+- Nothing in the rendered chart, corrected on 2026-09-23: the fix commit (#77)
+  meant to put the metrics exporter back on `v1.91.1` edited only the
+  repackaged `charts/valkey-0.8.1.tgz` and left the vendored `values.yaml`, the
+  source the chart renders from, on `v1.92.0` (a `sed` that missed the quoted
+  value). 0.1.6 therefore renders the exporter at `v1.92.0` like 0.1.5. The
+  Valkeys that had rolled onto 0.1.5 with the sidecar in `ImagePullBackOff`
+  recovered when retagger mirrored `v1.92.0` into gsoci (about 13:53Z) and
+  Flux's next attempt pulled it, not because of this release.
 
 ## [0.1.5] - 2026-09-23
 
