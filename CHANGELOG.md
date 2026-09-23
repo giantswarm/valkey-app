@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proposed only once retagger has mirrored the tag. Nothing in the rendered
   chart changes.
 
+### Fixed
+
+- The `helm.sh/chart` label of the wrapper chart's own objects is valid for
+  any chart version. A long version (a branch build, or the
+  `<version>+<digest>` helm-controller installs) cut to 63 characters could
+  end in `.`, `_` or `-`, and the API server refused the object; the helper
+  now trims that whole run (`trimAll "-._"`).
+
 ## [0.1.6] - 2026-09-23
 
 ### Changed
