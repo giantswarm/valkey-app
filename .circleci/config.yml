@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@10.6.2
+  architect: giantswarm/architect@10.6.3
 
 jobs:
   # helm lint of the wrapper chart and the vendored subchart plus the
