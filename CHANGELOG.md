@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Valkey rolls when its users' passwords change. The pod template carries a
+  checksum over the credentials beside `checksum/initconfig` and
+  `checksum/config`: `checksum/auth-secret`, the SHA-256 of the chart-rendered
+  `<fullname>-auth` Secret's data for inline passwords and `aclConfig`, and
+  `checksum/users-secret`, the new `auth.usersExistingSecretChecksum` value
+  verbatim for `auth.usersExistingSecret`, which the chart cannot read, so
+  whoever rotates that Secret changes the mark in the same change (a Flux
+  `HelmRelease` can feed it through `valuesFrom` with `targetPath`). Before, a
+  password rotated in the Secret left the running Valkey and its exporter on
+  the old value until a hand-run restart, and a client already on the new
+  value was refused (`WRONGPASS`). The same shape as the MCP server charts.
+- The pod template's checksums are annotations also without `podAnnotations`:
+  the vendored template opened the `annotations:` map only inside
+  `with .Values.podAnnotations`, so without any the `checksum/initconfig` and
+  `checksum/config` lines landed under `labels:` (as upstream `main` fixes it).
+- The packaged subchart `helm/valkey/charts/valkey-0.8.1.tgz` is regenerated
+  from the vendored directory; it lagged behind it since 0.1.4.
+
+### Added
+
+- Chart unit tests for the credential checksums
+  (`helm/valkey/charts/valkey/tests/auth_checksum_test.yaml`); `make helm-test`
+  runs `helm lint` and every suite, and the new `chart-test` CircleCI job runs
+  it on every branch and tag.
+
 ## [0.1.4] - 2026-08-26
 
 ### Fixed

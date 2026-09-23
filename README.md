@@ -65,11 +65,35 @@ spec:
 
 See our [full reference on how to configure apps](https://docs.giantswarm.io/tutorials/fleet-management/app-platform/app-configuration/) for more details.
 
+### Rolling on credential rotation
+
+Valkey reads its users' passwords once, when the pod starts. The subchart's pod template carries a checksum over the credentials, so a rotation restarts the pod: `checksum/auth-secret`, the SHA-256 of the chart-rendered `<fullname>-auth` Secret for inline passwords, and `checksum/users-secret`, the value of `valkey.auth.usersExistingSecretChecksum` verbatim for a Secret the chart does not render. Whoever rotates `valkey.auth.usersExistingSecret` changes that value in the same change (a hash over the new data, a counter, a date); a Flux `HelmRelease` can feed it from a Secret or ConfigMap key through `valuesFrom` with `targetPath`. See the subchart's [README](helm/valkey/charts/valkey/README.md#rolling-on-credential-rotation).
+
+```yaml
+valkey:
+  auth:
+    enabled: true
+    usersExistingSecret: "my-valkey-users"
+    usersExistingSecretChecksum: "2026-09-23-1"
+    aclUsers:
+      default:
+        permissions: "~* &* +@all"
+```
+
 ## Compatibility
 
 This app has been tested to work with the following workload cluster release versions:
 
 - CAPI workload clusters
+
+## The vendored chart
+
+`helm/valkey/charts/valkey` is upstream [valkey-io/valkey-helm](https://github.com/valkey-io/valkey-helm)'s `valkey` chart at the version `vendir.yml` pins, synced with `make update-chart` (`vendir sync`), which overwrites the directory. These changes are carried on top of it and have to be reapplied after a sync until upstream carries them:
+
+- The metrics exporter authenticates against Valkey when `auth.enabled` is set (`REDIS_PASSWORD` from `usersExistingSecret`/`passwordKey` or the chart's `<fullname>-auth` Secret), backported from a later upstream version.
+- The pod template's `checksum/auth-secret` and `checksum/users-secret` annotations and the `auth.usersExistingSecretChecksum` value (upstream: [valkey-io/valkey-helm#128](https://github.com/valkey-io/valkey-helm/pull/128) covers the rendered Secret's half), and the pod annotations rendered as annotations also without `podAnnotations` (upstream `main` has this).
+
+`make helm-test` lints the chart and runs its unit tests (`helm/valkey/charts/valkey/tests/`); the `chart-test` CircleCI job runs it on every branch and tag.
 
 ## Limitations
 
