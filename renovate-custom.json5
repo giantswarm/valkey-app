@@ -1,0 +1,10 @@
+// Repo-owned Renovate rules, extended last from the generated renovate.json5.
+{
+  packageRules: [
+    {
+      description: 'The vendored subchart defaults the metrics exporter to ghcr.io, but the wrapper values pull it from the gsoci mirror, which retagger fills on its own schedule. Look the tag up on the mirror, so a bump is proposed only once the image it ships can be pulled.',
+      matchDepNames: ['ghcr.io/oliver006/redis_exporter'],
+      overridePackageName: 'gsoci.azurecr.io/giantswarm/redis_exporter',
+    },
+  ],
+}

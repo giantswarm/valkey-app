@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ran ahead of it (the 0.1.6 fix) said nothing about what shipped. `helm
   package` ships the directory, `helm dependency build` still works, and the
   rendered chart is byte-identical.
+- Renovate looks the metrics exporter's tag up on the gsoci mirror the chart
+  pulls from (`renovate-custom.json5`) instead of on ghcr.io, so a bump is
+  proposed only once retagger has mirrored the tag. Nothing in the rendered
+  chart changes.
 
 ## [0.1.6] - 2026-09-23
 
