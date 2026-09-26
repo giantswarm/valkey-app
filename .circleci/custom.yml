@@ -10,7 +10,7 @@ jobs:
   # the tree differs (it fetches from the upstream chart repository).
   chart-test:
     docker:
-      - image: cimg/python:3.12
+      - image: cimg/python:3.14
     resource_class: small
     environment:
       HELM_VERSION: v3.16.0
