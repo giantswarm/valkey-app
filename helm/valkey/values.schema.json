@@ -3,6 +3,10 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+        "auth": {
+            "type": "object",
+            "additionalProperties": true
+        },
         "baseDomain": {
             "type": "string"
         },
