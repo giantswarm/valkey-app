@@ -168,11 +168,11 @@ false
 {{- end -}}
 
 {{/*
-Data of the <fullname>-auth Secret the chart renders (templates/secret.yaml),
-one "key: base64" line per entry: the inline passwords and the inline ACL
-configuration. Its SHA-256 is the pod template's checksum/auth-secret
-annotation, so the pod rolls when one of them changes; the Secret template and
-the annotation share it so the two cannot drift.
+Data of the <fullname>-auth Secret (templates/secret.yaml), one "key: base64"
+line per entry: the inline passwords and the inline ACL configuration. Its
+SHA-256 is the pod template's checksum/auth-secret annotation. It mirrors the
+Secret template's data block; sync/verify.sh renders both and fails when they
+disagree.
 */}}
 {{- define "valkey.authSecretData" -}}
 {{- $lines := list -}}
@@ -189,11 +189,9 @@ the annotation share it so the two cannot drift.
 
 {{/*
 The pod template's credential checksums, one "annotation: value" line each:
-the SHA-256 of the rendered <fullname>-auth Secret's data
-(checksum/auth-secret), and, for auth.usersExistingSecret, which the chart
-cannot read, auth.usersExistingSecretChecksum verbatim (checksum/users-secret)
-while it is set. Empty while auth is off, or while nothing marks the existing
-Secret's revision.
+checksum/auth-secret while the chart renders the auth Secret, and
+checksum/users-secret while auth.usersExistingSecret and
+auth.usersExistingSecretChecksum are set. Empty while auth is off.
 */}}
 {{- define "valkey.authChecksums" -}}
 {{- $lines := list -}}

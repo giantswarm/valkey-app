@@ -67,7 +67,7 @@ See our [full reference on how to configure apps](https://docs.giantswarm.io/tut
 
 ### Rolling on credential rotation
 
-Valkey reads its users' passwords once, when the pod starts. The subchart's pod template carries a checksum over the credentials, so a rotation restarts the pod: `checksum/auth-secret`, the SHA-256 of the chart-rendered `<fullname>-auth` Secret for inline passwords, and `checksum/users-secret`, the value of `valkey.auth.usersExistingSecretChecksum` verbatim for a Secret the chart does not render. Whoever rotates `valkey.auth.usersExistingSecret` changes that value in the same change (a hash over the new data, a counter, a date); a Flux `HelmRelease` can feed it from a Secret or ConfigMap key through `valuesFrom` with `targetPath`. See the subchart's [README](helm/valkey/charts/valkey/README.md#rolling-on-credential-rotation).
+Valkey reads its users' passwords once, when the pod starts. The subchart's pod template carries a checksum over the credentials, so a rotation restarts the pod: `checksum/auth-secret`, the SHA-256 of the chart-rendered `<fullname>-auth` Secret for inline passwords, and `checksum/users-secret`, the value of `valkey.auth.usersExistingSecretChecksum` verbatim for a Secret the chart does not render. Whoever rotates `valkey.auth.usersExistingSecret` changes that value in the same change (a hash over the new data, a counter, a date); a Flux `HelmRelease` can feed it from a Secret or ConfigMap key through `valuesFrom` with `targetPath`. See [The vendored chart](#the-vendored-chart).
 
 ```yaml
 valkey:
@@ -88,16 +88,21 @@ This app has been tested to work with the following workload cluster release ver
 
 ## The vendored chart
 
-`helm/valkey/charts/valkey` is upstream [valkey-io/valkey-helm](https://github.com/valkey-io/valkey-helm)'s `valkey` chart at the version `vendir.yml` pins, synced with `make update-chart` (`vendir sync`), which overwrites the directory. These changes are carried on top of it and have to be reapplied after a sync until upstream carries them:
+`helm/valkey/charts/valkey` is upstream [valkey-io/valkey-helm](https://github.com/valkey-io/valkey-helm)'s published `valkey` chart (`https://valkey.io/valkey-helm/`) at the version `vendir.yml` pins, plus the Giant Swarm delta in `sync/patches/`. Nothing in that directory is edited by hand.
 
-- The metrics exporter authenticates against Valkey when `auth.enabled` is set (`REDIS_PASSWORD` from `usersExistingSecret`/`passwordKey` or the chart's `<fullname>-auth` Secret), backported from a later upstream version.
-- The pod template's `checksum/auth-secret` and `checksum/users-secret` annotations and the `auth.usersExistingSecretChecksum` value (upstream: [valkey-io/valkey-helm#128](https://github.com/valkey-io/valkey-helm/pull/128) covers the rendered Secret's half), and the pod annotations rendered as annotations also without `podAnnotations` (upstream `main` has this).
+- `make update-chart` re-vendors the chart (`vendir sync`), re-applies the delta (`sync/patch.sh`), carries the upstream `appVersion` onto the wrapper and updates the dependency. Every patch is an anchored edit that fails loudly when upstream reworks the text it expects, and is a no-op once upstream ships the same change.
+- `make verify-sync` re-vendors the pinned version into a scratch copy, applies the patches and fails when the result differs from the tree, and checks that the credential checksum hashes exactly the data of the Secret the chart renders.
+- An upstream release arrives on its own: Renovate bumps `vendir.yml` on a `renovate/vendir/**` branch, the `Sync from upstream` workflow runs `make update-chart` on it, and taylorbot opens the sync PR from `main#update-chart`.
 
-The metrics exporter's `tag` in the vendored `values.yaml` is Renovate's. The wrapper pulls the exporter from the `gsoci.azurecr.io/giantswarm/redis_exporter` mirror, which retagger fills on its own schedule, so `renovate-custom.json5` has Renovate look the tag up there rather than on the subchart's default `ghcr.io/oliver006/redis_exporter`: a bump is proposed only once the mirror carries the tag.
+The delta, until upstream carries it:
 
-The packaged form of the subchart (`helm/valkey/charts/*.tgz`) is not committed: `helm dependency build` recreates it locally when needed, and the chart renders and packages from the directory, so the two cannot disagree.
+- `pod-annotations`: the pod annotations render as annotations also without `podAnnotations` (upstream from 0.9).
+- `exporter-auth`: the metrics exporter authenticates against Valkey when `auth.enabled` is set (upstream from 0.9).
+- `auth-checksum`: the pod template's `checksum/auth-secret` and `checksum/users-secret` annotations and the `auth.usersExistingSecretChecksum` value (upstream: [valkey-io/valkey-helm#128](https://github.com/valkey-io/valkey-helm/pull/128) covers the rendered Secret's half), and the auth Secret mounted only while the chart renders it.
 
-`make helm-test` lints the chart and runs its unit tests (`helm/valkey/charts/valkey/tests/`); the `chart-test` CircleCI job runs it on every branch and tag.
+The wrapper pins the metrics exporter's tag on the `gsoci.azurecr.io/giantswarm/redis_exporter` mirror; Renovate follows it there and leaves the vendored chart alone.
+
+`make helm-test` lints both charts, runs the unit tests in `tests/chart/` against the vendored chart and runs `make verify-sync`; the `chart-test` CircleCI job runs it on every branch.
 
 ## Limitations
 
