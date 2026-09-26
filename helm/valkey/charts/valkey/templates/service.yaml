@@ -4,6 +4,7 @@ metadata:
   name: {{ include "valkey.fullname" . }}
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: primary
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -13,6 +14,12 @@ spec:
   {{- if .Values.service.clusterIP }}
   clusterIP: {{ .Values.service.clusterIP }}
   {{- end }}
+  {{- if .Values.service.loadBalancerClass }}
+  loadBalancerClass: {{ .Values.service.loadBalancerClass }}
+  {{- end }}
+  {{- if .Values.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges: {{ .Values.service.loadBalancerSourceRanges }}
+  {{- end }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: tcp
@@ -21,5 +28,11 @@ spec:
       {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
+      {{- if .Values.service.appProtocol }}
+      appProtocol: {{ .Values.service.appProtocol }}
+      {{- end }}
   selector:
     {{- include "valkey.selectorLabels" . | nindent 4 }}
+    {{- if .Values.replica.enabled }}
+    statefulset.kubernetes.io/pod-name: {{ include "valkey.fullname" . }}-0
+    {{- end }}

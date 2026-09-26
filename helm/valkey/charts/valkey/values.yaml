@@ -4,9 +4,6 @@ global:
   # The global image pull secrets (list of secret names)
   imagePullSecrets: []
 
-# Number of Valkey pods to run
-replicaCount: 1
-
 image:
   # Image registry
   registry: "docker.io"
@@ -24,6 +21,9 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# Kubernetes cluster domain name
+clusterDomain: cluster.local
+
 serviceAccount:
   # Create a service account for Valkey
   create: true
@@ -38,6 +38,9 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
+# Annotations for the Deployment/StatefulSet resource
+workloadAnnotations: {}
+
 # Common labels to add to all resources (Deployment, Service, ConfigMap, etc.)
 commonLabels: {}
 
@@ -46,12 +49,20 @@ podSecurityContext:
   fsGroup: 1000
   runAsUser: 1000
   runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
 # Priority class name for pod scheduling (leave empty to use cluster's default)
 priorityClassName: ""
 
+# RuntimeClassName for the pods, used to select the container runtime configuration
+# (e.g. "gvisor", "kata-containers"). Leave empty to use the cluster's default runtime.
+# See https://kubernetes.io/docs/concepts/containers/runtime-class/#usage
+runtimeClassName: ""
+
 # Security context for the Valkey containers
 securityContext:
+  allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
@@ -69,6 +80,14 @@ service:
   nodePort: 0
   # ClusterIP value
   clusterIP: ""
+  # Class of a load balancer implementation
+  loadBalancerClass: ""
+  # If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer
+  # will be restricted to the specified client IPs.
+  # This field will be ignored if the cloud-provider does not support the feature.
+  loadBalancerSourceRanges: []
+  # Application protocol
+  appProtocol: ""
 
 # Network policy to control traffic to the pods
 # More info: https://kubernetes.io/docs/concepts/services-networking/network-policies/
@@ -94,10 +113,43 @@ initResources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
+# Health probes for the main Valkey container.
+# Each probe is gated on its own `enabled` flag and rendered by the
+# `valkey.healthProbes` helper. The default handler is a `valkey-cli ping` exec
+# (TLS-aware). Set `customProbe` to a full probe spec to replace the default
+# handler and timing entirely (e.g. an httpGet or tcpSocket probe).
+# The defaults below match the previous hardcoded behavior (Kubernetes probe
+# defaults); readinessProbe is opt-in since the container had none before.
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 3
+  customProbe: {}
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 3
+  customProbe: {}
+readinessProbe:
+  enabled: false
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 3
+  successThreshold: 1
+  customProbe: {}
+
 # Additional init containers
 extraInitContainers: []
 
-# Persistent storage configuration
+# Additional containers
+extraContainers: []
+
+# Persistent storage configuration (standalone deployment only)
 dataStorage:
   # Enable persistent volume claim creation
   enabled: false
@@ -130,6 +182,9 @@ dataStorage:
   # Optional labels to add to the PVC
   labels: {}
 
+  # If hostPath is set then a hostPath DirectoryOrCreate volume is used
+  hostPath: ""
+
 # Mount additional secrets into the Valkey container
 extraValkeySecrets: []
 
@@ -140,28 +195,32 @@ extraValkeyConfigs: []
 extraSecretValkeyConfigs: false
 
 # Mount additional emptyDir or hostPath volumes (advanced use)
-extraStorage: []
+extraVolumes: []
+#  - name: hostpath-volume
+#    hostPath:
+#      path: /opt/valkey/hostpath-volume/
+#      type: DirectoryOrCreate
+extraVolumeMounts: []
+#  - mountPath: /some/path/
+#    name: hostpath-volume
 
 # Content for valkey.conf (will be mounted via ConfigMap)
 valkeyConfig: ""
 
 auth:
   # Enable ACL-based authentication
+  # IMPORTANT: When authentication is enabled, the 'default' user MUST be defined in either
+  # aclUsers or aclConfig. Without a default user, anyone can access the database without
+  # credentials, creating a security risk.
   enabled: false
 
   # Use an existing secret for user passwords. Key defaults to username.
+  # Supports templating, e.g.: "users-{{ .Release.Name }}"
   usersExistingSecret: ""
-
-  # A mark of the existing secret's revision, rendered verbatim as the pod
-  # template's checksum/users-secret annotation. The chart cannot read the
-  # secret, and the init container reads it once: change this value in the
-  # same change that rotates a password (a hash over the new data, a counter,
-  # a date) so the pod restarts onto it. While empty, a rotation of the
-  # existing secret alone leaves the running Valkey on the old passwords.
-  usersExistingSecretChecksum: ""
 
   # Map of users to create with ACL permissions.
   # If usersExistingSecret is set, passwords from the secret take priority over inline passwords.
+  # NOTE: If using aclUsers, the 'default' user must be included here.
   aclUsers: {}
   # Example:
   # default:
@@ -172,10 +231,74 @@ auth:
   #   permissions: "~* -@all +@read +ping +info"
 
   # Inline ACL configuration that will be appended after generated users.
+  # NOTE: If using aclConfig, ensure the 'default' user is defined here.
   aclConfig: ""
   # Example:
   # aclConfig: |
   #   user default on >secretpass ~* &* +@all
+
+# Replica configuration for master-replica replication mode
+replica:
+  enabled: false
+
+  # Number of replica instances (total pods = replicas + 1 master)
+  replicas: 2
+
+  # Username for replicas to authenticate to master, ignored if auth.enabled is false.
+  # IMPORTANT: When auth.enabled is true, this user MUST be defined in auth.aclUsers.
+  # The chart requires this to retrieve the password for replica authentication.
+  # The user must have appropriate replication permissions: +psync +replconf +ping
+  replicationUser: "default"
+
+  # Replication settings
+  # Use diskless replication (sync directly from memory) vs disk-based
+  disklessSync: false
+
+  # Write safety - require minimum number of healthy replicas to accept writes
+  # Set to 0 to disable this check, or 1+ to require minimum replicas before accepting writes
+  # This ensures data durability by requiring at least N replicas to be in sync
+  minReplicasToWrite: 0
+
+  # Maximum replication lag in seconds before a replica is considered unhealthy
+  minReplicasMaxLag: 10
+
+  # Read service configuration
+  service:
+    # Enable read service (load balances read traffic across all pods)
+    enabled: true
+    # Service type (ClusterIP, NodePort, LoadBalancer)
+    type: ClusterIP
+    # Port on which the read service will be exposed
+    port: 6379
+    # Optional annotations for the read service
+    annotations: {}
+    # NodePort value (if service.type is NodePort)
+    nodePort: 0
+    # ClusterIP value
+    clusterIP: ""
+    # Application protocol
+    appProtocol: ""
+    # Class of a load balancer implementation
+    loadBalancerClass: ""
+    # If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer
+    # will be restricted to the specified client IPs.
+    # This field will be ignored if the cloud-provider does not support the feature.
+    loadBalancerSourceRanges: []
+
+  # Persistence configuration (required for replicas)
+  persistence:
+    # Size of the PVC for each replica (required when replica.enabled is true)
+    size: ""
+    # Storage class name (empty = use default storage class)
+    storageClass: ""
+    # Access modes for the PVC
+    accessModes:
+      - ReadWriteOnce
+
+  # PersistentVolumeClaim retention policy for StatefulSet
+  # Controls when PVCs are deleted (requires Kubernetes 1.23+)
+  # More info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
+  persistentVolumeClaimRetentionPolicy: {}
 
 tls:
   # Enable TLS
@@ -203,14 +326,28 @@ tolerations: []
 affinity: {}
 
 # Set Deployment strategy. See https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
-deploymentStrategy: RollingUpdate
+deploymentStrategy: RollingUpdate # @schema enum:[RollingUpdate,Recreate]
 
 # See https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints
 topologySpreadConstraints: []
 
+# PodDisruptionBudget configuration (only used in replicated mode)
+# Helps keep enough replicas available during voluntary disruptions
+podDisruptionBudget:
+  # Enable PodDisruptionBudget
+  enabled: false
+  # Minimum number of pods that must be available (takes precedence over maxUnavailable if both set)
+  minAvailable: null
+  # Maximum number of pods that can be unavailable during disruptions
+  maxUnavailable: 1
+  # Unhealthy pod eviction policy (optional)
+  # Valid values: IfHealthyBudget, AlwaysAllow
+  unhealthyPodEvictionPolicy: ""
+
 # Valkey logging level: debug, verbose, notice, warning
 valkeyLogLevel: "notice"
 # Environment variables to inject into Valkey container
+
 env: {}
   # Example:
   # LOG_LEVEL: info
@@ -248,6 +385,8 @@ metrics:
       #   memory: 128Mi
     # Extra volume mounts for metrics exporter container
     extraVolumeMounts: []
+    # Additional secrets to mount for metrics exporter
+    extraExporterSecrets: []
     # Environment variables to inject into the metrics exporter container
     extraEnvs: {}
     # Example:
@@ -276,6 +415,8 @@ metrics:
     # Optional labels for the metrics exporter service
     extraLabels: {}
     # ServiceMonitor configuration for Prometheus Operator
+    # Application protocol
+    appProtocol: ""
   serviceMonitor:
     # Enable ServiceMonitor resource for scraping service metrics
     enabled: false

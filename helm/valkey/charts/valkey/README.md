@@ -1,6 +1,6 @@
 # valkey
 
-![Version: 0.8.1](https://img.shields.io/badge/Version-0.8.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.1.4](https://img.shields.io/badge/AppVersion-8.1.4-informational?style=flat-square)
+![Version: 0.11.0](https://img.shields.io/badge/Version-0.11.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.1](https://img.shields.io/badge/AppVersion-9.1.1-informational?style=flat-square)
 
 A Helm chart for Kubernetes
 
@@ -8,18 +8,106 @@ A Helm chart for Kubernetes
 
 ## Maintainers
 
-| Name | Email | Url |
-| ---- | ------ | --- |
-| raven |  | <https://github.com/mk-raven> |
-
+| Name | Url |
+| ---- | --- |
+| raven | [https://github.com/mk-raven] |
+| sgissi | [https://github.com/sgissi] |
+| Bloodraven21 | [https://github.com/Bloodraven21] |
 ## Source Code
 
 * <https://github.com/valkey-io/valkey-helm.git>
 * <https://valkey.io>
 
+## Deployment Modes
+
+### Standalone Mode (Default)
+
+Deploy a single Valkey instance:
+
+```bash
+helm install valkey valkey/valkey
+```
+
+**Services:**
+
+* `valkey`: Master/read-write service
+
+### Replication Mode
+
+Deploy Valkey with master-replica architecture for read scaling and data redundancy:
+
+```bash
+helm install valkey valkey/valkey --set replica.enabled=true --set replica.persistence.size=5Gi
+```
+
+**IMPORTANT**
+
+## Cluster Mode
+
+This chart does not and will not support **Valkey cluster** mode. Managing a clustered topology is fundamentally different from standalone or replicated deployments, and the operational requirements go well beyond what this chart is designed to handle.
+
+For cluster mode, a separate chart is being developed that uses the valkey-operator to deploy and manage clusters. The operator must be installed first.
+
+To follow progress or get involved, see the [weekly meeting wiki](https://github.com/valkey-io/valkey-operator/wiki/Weekly-meeting). 
+
+**Services:**
+
+* `valkey`: Master/write service
+* `valkey-read`: Read service (load-balances across all pods) - optional
+* `valkey-headless`: Headless service for pod discovery
+
+**Write Safety Configuration:**
+
+Ensure data durability by requiring a minimum number of replicas to be in sync before accepting writes:
+
+```yaml
+replica:
+  minReplicasToWrite: 1  # Require at least 1 replica
+  minReplicasMaxLag: 10  # Max 10 seconds replication lag
+```
+
+If fewer than `minReplicasToWrite` replicas are available, the master will reject write operations.
+
+## Storage
+
+### Standalone Storage
+
+Persistence is optional. By default, data is stored in an ephemeral volume and lost on pod restart.
+
+**Enable persistent storage:**
+
+```yaml
+dataStorage:
+  enabled: true
+  requestedSize: 10Gi
+  className: "fast-ssd"  # Optional
+```
+
+**Use existing PVC:**
+
+```yaml
+dataStorage:
+  enabled: true
+  persistentVolumeClaimName: "my-existing-pvc"
+```
+
+### Replication Storage
+
+Persistent storage is **mandatory** in replication mode. Without it, the primary might come up with an empty dataset after a restart, all replicas will synchronize with the empty primary and lose their data. See [Valkey Replication Safety](https://valkey.io/topics/replication/#safety-of-replication-when-primary-has-persistence-turned-off) for details.
+
+```yaml
+replica:
+  enabled: true
+  persistence:
+    size: 10Gi  # Required
+    storageClass: "fast-ssd"  # Optional
+```
+
 ## Authentication
 
 This chart supports ACL-based authentication for Valkey.
+
+**⚠️ IMPORTANT:** When authentication is enabled, the `default` user **MUST** be defined in either `auth.aclUsers` or `auth.aclConfig`. Without a default user, anyone can access the database without credentials.
 
 ### Existing Secret (recommended)
 
@@ -30,9 +118,9 @@ auth:
   enabled: true
   usersExistingSecret: "my-valkey-users"
   aclUsers:
-    admin:
+    default:
       permissions: "~* &* +@all"
-      # Password will be read from secret key "admin" (defaults to username)
+      # Password will be read from secret key "default" (defaults to username)
     readonly:
       permissions: "~* -@all +@read +ping +info"
       passwordKey: "readonly-pwd"  # Use custom secret key name
@@ -46,9 +134,9 @@ Define users directly in your values file with inline passwords:
 auth:
   enabled: true
   aclUsers:
-    admin:
+    default:
       permissions: "~* &* +@all"
-      password: "admin-password"
+      password: "default-password"
     readonly:
       permissions: "~* -@all +@read +ping +info"
       password: "readonly-password"
@@ -68,6 +156,92 @@ auth:
   aclConfig: |
     user default on >defaultpassword ~* &* +@all
     user guest on nopass ~public:* +@read
+```
+
+### Replication with Authentication
+
+When using ACL authentication in replication mode, replicas need credentials to authenticate to the master:
+
+```yaml
+auth:
+  enabled: true
+  usersExistingSecret: "my-valkey-users"
+  aclUsers:
+    default:
+      permissions: "~* &* +@all"
+    replication-user:
+      permissions: "+psync +replconf +ping"
+
+replica:
+  enabled: true
+  replicas: 2
+  replicationUser: "replication-user"  # Must be defined in auth.aclUsers
+```
+
+**Important Notes:**
+
+* `replica.replicationUser` specifies which ACL user replicas use to authenticate
+* This user MUST be defined in `auth.aclUsers` with appropriate permissions
+* Minimum permissions: `+psync +replconf +ping`
+
+## Metrics
+
+This chart supports Prometheus metrics collection using the [Redis exporter](https://github.com/oliver006/redis_exporter).
+
+Enable the metrics exporter sidecar:
+
+```yaml
+metrics:
+  enabled: true
+```
+
+### Prometheus Operator discovery
+
+Automated Prometheus discovery using the Prometheus Operator ServiceMonitor:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+## PodDisruptionBudget
+
+A PodDisruptionBudget helps keep enough read-replicas available during voluntary disruptions like node drains or rolling updates.
+
+**Enable PDB (only works in replicated mode):**
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1  # Allow at most 1 pod to be unavailable
+```
+
+**Or use minAvailable to guarantee a specific number of replicas:**
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2  # Always keep at least 2 replicas running
+```
+
+## TLS
+
+This chart supports TLS encryption for Valkey connections.
+
+First create a secret containing the certificate public and private keys plus CA public key:
+
+```shell
+kubectl create secret generic valkey-tls-secret --from-file=server.crt --from-file=server.key --from-file=ca.crt
+```
+
+Enable TLS and provide the name of the secret created above:
+
+```yaml
+tls:
+  enabled: true
+  existingSecret: "valkey-tls-secret"
 ```
 
 ## Values
@@ -91,10 +265,12 @@ auth:
 | dataStorage.requestedSize | string | `""` |  |
 | dataStorage.subPath | string | `""` |  |
 | dataStorage.volumeName | string | `"valkey-data"` |  |
+| dataStorage.hostPath | string | `""` |  |
 | deploymentStrategy | string | `"RollingUpdate"` |  |
 | env | object | `{}` |  |
 | extraSecretValkeyConfigs | bool | `false` |  |
-| extraStorage | list | `[]` |  |
+| extraVolumes | list | `[]` |  |
+| extraVolumeMounts | list | `[]` |  |
 | extraValkeyConfigs | list | `[]` |  |
 | extraValkeySecrets | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
@@ -104,6 +280,12 @@ auth:
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | initResources | object | `{}` |  |
+| livenessProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
+| livenessProbe.enabled | bool | `true` |  |
+| livenessProbe.failureThreshold | int | `3` |  |
+| livenessProbe.initialDelaySeconds | int | `0` |  |
+| livenessProbe.periodSeconds | int | `10` |  |
+| livenessProbe.timeoutSeconds | int | `1` |  |
 | metrics.enabled | bool | `false` |  |
 | metrics.exporter.args | list | `[]` |  |
 | metrics.exporter.command | list | `[]` |  |
@@ -137,6 +319,7 @@ auth:
 | metrics.service.extraLabels | object | `{}` |  |
 | metrics.service.ports.http | int | `9121` |  |
 | metrics.service.type | string | `"ClusterIP"` |  |
+| metrics.service.appProtocol | string | `""` |  |
 | metrics.serviceMonitor.additionalLabels | object | `{}` |  |
 | metrics.serviceMonitor.annotations | object | `{}` |  |
 | metrics.serviceMonitor.enabled | bool | `false` |  |
@@ -156,11 +339,40 @@ auth:
 | podAnnotations | object | `{}` |  |
 | podLabels | object | `{}` |  |
 | commonLabels | object | `{}` |  |
+| podDisruptionBudget.enabled | bool | `false` |  |
+| podDisruptionBudget.minAvailable | int or string | `null` | Minimum pods available during disruptions |
+| podDisruptionBudget.maxUnavailable | int or string | `1` | Maximum pods unavailable during disruptions |
+| podDisruptionBudget.unhealthyPodEvictionPolicy | string | `null` | Policy for evicting unhealthy pods |
 | podSecurityContext.fsGroup | int | `1000` |  |
 | podSecurityContext.runAsGroup | int | `1000` |  |
 | podSecurityContext.runAsUser | int | `1000` |  |
 | priorityClassName | string | `""` |  |
-| replicaCount | int | `1` |  |
+| runtimeClassName | string | `""` | RuntimeClassName for the pods (e.g. `gvisor`, `kata-containers`); empty uses the cluster default runtime |
+| readinessProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
+| readinessProbe.enabled | bool | `false` | Opt-in; the Valkey container had no readiness probe before |
+| readinessProbe.failureThreshold | int | `3` |  |
+| readinessProbe.initialDelaySeconds | int | `0` |  |
+| readinessProbe.periodSeconds | int | `10` |  |
+| readinessProbe.successThreshold | int | `1` |  |
+| readinessProbe.timeoutSeconds | int | `1` |  |
+| replica.enabled | bool | `false` |  |
+| replica.replicas | int | `2` |  |
+| replica.replicationUser | string | `"default"` |  |
+| replica.disklessSync | bool | `false` |  |
+| replica.minReplicasToWrite | int | `0` |  |
+| replica.minReplicasMaxLag | int | `10` |  |
+| replica.service.enabled | bool | `"true"` |  |
+| replica.service.type | string | `"ClusterIP"` |  |
+| replica.service.port | int | `6379` |  |
+| replica.service.annotations | object | `{}` |  |
+| replica.service.nodePort | int | `0` |  |
+| replica.service.clusterIP | string | `""` |  |
+| replica.service.appProtocol | string | `""` |  |
+| replica.service.loadBalancerClass | string | `""` |  |
+| replica.persistence. |  | `""` |  |
+| replica.persistence.size | string | `""` | Required if replica is enabled |
+| replica.persistence.storageClass | string | `""` |  |
+| replica.persistence.accessModes | list | `""` |  |
 | resources | object | `{}` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
@@ -170,10 +382,18 @@ auth:
 | service.nodePort | int | `0` |  |
 | service.port | int | `6379` |  |
 | service.type | string | `"ClusterIP"` |  |
+| service.appProtocol | string | `""` |  |
+| service.loadBalancerClass | string | `""` |  |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.automount | bool | `false` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
+| startupProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
+| startupProbe.enabled | bool | `true` |  |
+| startupProbe.failureThreshold | int | `3` |  |
+| startupProbe.initialDelaySeconds | int | `0` |  |
+| startupProbe.periodSeconds | int | `10` |  |
+| startupProbe.timeoutSeconds | int | `1` |  |
 | tls.caPublicKey | string | `"ca.crt"` |  |
 | tls.dhParamKey | string | `""` |  |
 | tls.enabled | bool | `false` |  |
@@ -185,3 +405,4 @@ auth:
 | topologySpreadConstraints | list | `[]` |  |
 | valkeyConfig | string | `""` |  |
 | valkeyLogLevel | string | `"notice"` |  |
+| workloadAnnotations | object | `{}` |  |
