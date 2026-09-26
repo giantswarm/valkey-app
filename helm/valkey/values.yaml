@@ -6,7 +6,9 @@
 #   https://docs.giantswarm.io/tutorials/fleet-management/app-platform/app-configuration/#basic-values-merging-example
 #
 
-valkey:
+# The upstream subchart's values, validated by its own values.schema.json:
+# the wrapper schema leaves the block open instead of mirroring it.
+valkey:  # @schema skipProperties: true; additionalProperties: true
   # Configuration for the Valkey image
   image:
     # Use Giant Swarm's container registry
