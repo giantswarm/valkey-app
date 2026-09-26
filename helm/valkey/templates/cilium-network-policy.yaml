@@ -45,4 +45,3 @@ spec:
         - port: "9121"
           protocol: TCP
 {{ end }}
-
