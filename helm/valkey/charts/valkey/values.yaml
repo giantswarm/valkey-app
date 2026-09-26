@@ -218,6 +218,14 @@ auth:
   # Supports templating, e.g.: "users-{{ .Release.Name }}"
   usersExistingSecret: ""
 
+  # A mark of the existing secret's revision, rendered verbatim as the pod
+  # template's checksum/users-secret annotation. The chart cannot read the
+  # secret, and the init container reads it once: change this value in the
+  # same change that rotates a password (a hash over the new data, a counter,
+  # a date) so the pod restarts onto it. While empty, a rotation of the
+  # existing secret alone leaves the running Valkey on the old passwords.
+  usersExistingSecretChecksum: ""
+
   # Map of users to create with ACL permissions.
   # If usersExistingSecret is set, passwords from the secret take priority over inline passwords.
   # NOTE: If using aclUsers, the 'default' user must be included here.

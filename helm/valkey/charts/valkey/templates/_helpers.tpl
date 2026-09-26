@@ -226,3 +226,54 @@ enabled, so callers should guard with `with`.
 {{- end -}}
 {{- end -}}
 
+
+{{/*
+Whether the chart renders the <fullname>-auth Secret: auth on with an inline
+password or an inline ACL configuration.
+*/}}
+{{- define "valkey.renderAuthSecret" -}}
+{{- if and .Values.auth.enabled (or (include "valkey.hasInlinePasswords" . | eq "true") .Values.auth.aclConfig) -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end -}}
+
+{{/*
+Data of the <fullname>-auth Secret (templates/secret.yaml), one "key: base64"
+line per entry: the inline passwords and the inline ACL configuration. Its
+SHA-256 is the pod template's checksum/auth-secret annotation. It mirrors the
+Secret template's data block; sync/verify.sh renders both and fails when they
+disagree.
+*/}}
+{{- define "valkey.authSecretData" -}}
+{{- $lines := list -}}
+{{- range $username, $user := .Values.auth.aclUsers -}}
+{{- if $user.password -}}
+{{- $lines = append $lines (printf "%s-password: %s" $username ($user.password | b64enc)) -}}
+{{- end -}}
+{{- end -}}
+{{- if .Values.auth.aclConfig -}}
+{{- $lines = append $lines (printf "aclConfig: %s" (.Values.auth.aclConfig | b64enc)) -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}
+
+{{/*
+The pod template's credential checksums, one "annotation: value" line each:
+checksum/auth-secret while the chart renders the auth Secret, and
+checksum/users-secret while auth.usersExistingSecret and
+auth.usersExistingSecretChecksum are set. Empty while auth is off.
+*/}}
+{{- define "valkey.authChecksums" -}}
+{{- $lines := list -}}
+{{- if .Values.auth.enabled -}}
+{{- if include "valkey.renderAuthSecret" . | eq "true" -}}
+{{- $lines = append $lines (printf "checksum/auth-secret: %q" (include "valkey.authSecretData" . | sha256sum)) -}}
+{{- end -}}
+{{- if and .Values.auth.usersExistingSecret .Values.auth.usersExistingSecretChecksum -}}
+{{- $lines = append $lines (printf "checksum/users-secret: %q" .Values.auth.usersExistingSecretChecksum) -}}
+{{- end -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}

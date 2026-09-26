@@ -19,6 +19,9 @@
                 },
                 "usersExistingSecret": {
                     "type": "string"
+                },
+                "usersExistingSecretChecksum": {
+                    "type": "string"
                 }
             }
         },
