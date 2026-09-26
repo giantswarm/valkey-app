@@ -88,3 +88,8 @@ vpa:
   containerPolicies:
     minAllowed:
       cpu: "50m"
+
+# Not read by this chart: Valkey's authentication is `valkey.auth`. Installations
+# that set a top-level `auth` block (accepted by 0.1.x, whose schema left the
+# root open) keep upgrading; the block has no effect.
+auth: {}  # @schema additionalProperties: true

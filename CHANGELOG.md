@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The wrapper schema accepts a top-level `auth` block again, as 0.1.x did. 0.2.0 refused the upgrade for installations that set it beside `valkey.auth`. The block has no effect.
+
 ### Changed
 
 - The vendored subchart is upstream's published chart (`https://valkey.io/valkey-helm/`, vendir `helmChart`), which Renovate follows, and the Giant Swarm delta lives in `sync/patches/`, re-applied by `make update-chart` after every `vendir sync`. `make verify-sync` fails when the tree is not the pinned chart plus the patches. The rendered chart is unchanged.
