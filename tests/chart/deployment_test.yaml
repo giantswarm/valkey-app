@@ -23,6 +23,9 @@ tests:
     set:
       auth.enabled: true
       auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+          password: "default-password"
         admin:
           permissions: "~* &* +@all"
           password: "admin-password"
@@ -49,6 +52,9 @@ tests:
       auth.enabled: true
       auth.usersExistingSecret: "my-custom-secret"
       auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+          password: "default-password"
         admin:
           permissions: "~* &* +@all"
     template: templates/deploy_valkey.yaml
@@ -74,6 +80,9 @@ tests:
       auth.enabled: true
       auth.usersExistingSecret: "my-custom-secret"
       auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+          password: "default-password"
         admin:
           permissions: "~* &* +@all"
           password: "admin-password"
@@ -114,14 +123,12 @@ tests:
               secretName: RELEASE-NAME-valkey-auth
               defaultMode: 0400
 
-  - it: should have correct replicas
-    set:
-      replicaCount: 3
+  - it: should run the standalone Deployment as a single replica
     template: templates/deploy_valkey.yaml
     asserts:
       - equal:
           path: spec.replicas
-          value: 3
+          value: 1
 
   - it: should use custom image
     set:

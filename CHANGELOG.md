@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The vendored subchart is upstream's published chart (`https://valkey.io/valkey-helm/`, vendir `helmChart`), which Renovate follows, and the Giant Swarm delta lives in `sync/patches/`, re-applied by `make update-chart` after every `vendir sync`. `make verify-sync` fails when the tree is not the pinned chart plus the patches. The rendered chart is unchanged.
 - The metrics exporter's tag is pinned in the wrapper's values on the gsoci mirror, not in the vendored values.
 - The unit tests moved to `tests/chart/`, and an ATS smoke installs the chart with the agent platform's values and checks that the exporter reaches Valkey authenticated.
-- Updated `valkey` to upstream version `v9.1.2`.
+- Updated `valkey` to upstream chart 0.12.0, Valkey 9.1.2 (from 8.1.4). With `valkey.auth.enabled`, `valkey.auth.aclUsers` must define the `default` user; the chart refuses to render otherwise, since Valkey would let unauthenticated clients in as `default`. The standalone Deployment always runs one replica (`replicaCount` has no effect; replication is the chart's `replica` mode).
 
 ### Fixed
 
