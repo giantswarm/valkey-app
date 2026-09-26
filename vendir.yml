@@ -12,6 +12,6 @@ directories:
   - path: .
     helmChart:
       name: valkey
-      version: "0.8.1"
+      version: "0.12.0"
       repository:
         url: https://valkey.io/valkey-helm/

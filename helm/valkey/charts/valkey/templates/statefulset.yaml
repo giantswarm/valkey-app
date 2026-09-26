@@ -1,10 +1,9 @@
-{{- if not .Values.replica.enabled }}
-{{- $fullname := include "valkey.fullname" . }}
-{{- $storage := .Values.dataStorage }}
-{{- $createPVC := and $storage.enabled (not (empty $storage.requestedSize)) (empty $storage.persistentVolumeClaimName) }}
+{{- if .Values.replica.enabled }}
 {{- include "valkey.validateAuthConfig" . }}
+{{- include "valkey.validateReplicaPersistence" . }}
+{{- include "valkey.validateReplicaAuth" . }}
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "valkey.fullname" . }}
   labels:
@@ -14,12 +13,29 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  replicas: 1
-  strategy:
-    type: {{ .Values.deploymentStrategy }}
+  serviceName: {{ include "valkey.fullname" . }}-headless
+  replicas: {{ add (int .Values.replica.replicas) 1 }}
+  podManagementPolicy: OrderedReady
+  {{- if .Values.replica.persistentVolumeClaimRetentionPolicy }}
+  persistentVolumeClaimRetentionPolicy:
+    {{- toYaml .Values.replica.persistentVolumeClaimRetentionPolicy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "valkey.selectorLabels" . | nindent 6 }}
+  volumeClaimTemplates:
+  - apiVersion: v1	
+    kind: PersistentVolumeClaim
+    metadata:
+      name: valkey-data
+    spec:
+      accessModes: {{ toYaml .Values.replica.persistence.accessModes | nindent 8 }}
+      {{- if .Values.replica.persistence.storageClass }}
+      storageClassName: {{ .Values.replica.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.replica.persistence.size | quote }}
   template:
     metadata:
       labels:
@@ -31,18 +47,18 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
-        {{- with .Values.podAnnotations }}
+      {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
-        checksum/initconfig: {{ include (print $.Template.BasePath "/init_config.yaml") . | sha256sum | trunc 32 }}
+      {{- end }}
+        checksum/initconfig: {{ include (print $.Template.BasePath "/init_config.yaml") . | sha256sum | trunc 32 | quote }}
         {{- if .Values.valkeyConfig }}
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 32 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 32 | quote }}
         {{- end }}
         {{- with include "valkey.authChecksums" . }}
         {{- . | nindent 8 }}
         {{- end }}
     spec:
-      {{- include "valkey.imagePullSecrets" . | nindent 6 }}
+      {{- (include "valkey.imagePullSecrets" .) | nindent 6 }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       serviceAccountName: {{ include "valkey.serviceAccountName" . }}
       {{- if .Values.priorityClassName }}
@@ -52,7 +68,7 @@ spec:
       runtimeClassName: {{ .Values.runtimeClassName | quote }}
       {{- end }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
         - name: {{ include "valkey.fullname" . }}-init
           image: {{ include "valkey.image" . }}
@@ -62,12 +78,14 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           command: [ "/scripts/init.sh" ]
+          env:
+            - name: POD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
           volumeMounts:
-            - name: {{ .Values.dataStorage.volumeName }}
+            - name: valkey-data
               mountPath: /data
-              {{- if .Values.dataStorage.subPath }}
-              subPath: {{ .Values.dataStorage.subPath }}
-              {{- end }}
             - name: scripts
               mountPath: /scripts
             {{- if .Values.valkeyConfig }}
@@ -93,9 +111,6 @@ spec:
               readOnly: true
             {{- end }}
             {{- end }}
-            {{- with .Values.extraVolumeMounts }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
           {{- with .Values.initResources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -112,6 +127,10 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           env:
+            - name: POD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
             {{- range $key, $val := .Values.env }}
             - name: {{ $key }}
               value: "{{ $val }}"
@@ -128,11 +147,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: {{ .Values.dataStorage.volumeName }}
+            - name: valkey-data
               mountPath: /data
-              {{- if .Values.dataStorage.subPath }}
-              subPath: {{ .Values.dataStorage.subPath }}
-              {{- end }}
             {{- if .Values.tls.enabled }}
             - name: {{ include "valkey.fullname" . }}-tls
               mountPath: /tls
@@ -211,9 +227,9 @@ spec:
               value: "{{ $val }}"
             {{- end }}
         {{- end }}
-      {{- with .Values.extraContainers }}
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: scripts
           configMap:
@@ -268,20 +284,6 @@ spec:
             secretName: {{ include "valkey.fullname" . }}-auth
             defaultMode: 0400
         {{- end }}
-        {{- end }}
-        - name: {{ $storage.volumeName }}
-        {{- if $storage.persistentVolumeClaimName }}
-          persistentVolumeClaim:
-            claimName: {{ $storage.persistentVolumeClaimName }}
-        {{- else if $createPVC }}
-          persistentVolumeClaim:
-            claimName: {{ include "valkey.fullname" . }}
-        {{- else if $storage.hostPath }}
-          hostPath:
-            path: {{ $storage.hostPath }}
-            type: DirectoryOrCreate
-        {{- else }}
-          emptyDir: {}
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

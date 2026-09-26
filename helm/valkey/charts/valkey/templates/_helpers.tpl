@@ -68,20 +68,20 @@ Create the name of the service account to use
 Returns the Valkey container image
 */}}
 {{- define "valkey.image" -}}
-{{- include "common.image" (dict "image" (dict "registry" .Values.image.registry "repository" .Values.image.repository "tag" (.Values.image.tag | default .Chart.AppVersion)) "global" .Values.global) }}
+{{- include "valkey.common.image" (dict "image" (dict "registry" .Values.image.registry "repository" .Values.image.repository "tag" (.Values.image.tag | default .Chart.AppVersion)) "global" .Values.global) }}
 {{- end -}}
 
 {{/*
 Returns the Valkey exporter container image
 */}}
 {{- define "valkey.metrics.exporter.image" -}}
-{{- include "common.image" (dict "image" .Values.metrics.exporter.image "global" .Values.global) }}
+{{- include "valkey.common.image" (dict "image" .Values.metrics.exporter.image "global" .Values.global) }}
 {{- end -}}
 
 {{/*
 The common image function that renders the container image
 */}}
-{{- define "common.image" -}}
+{{- define "valkey.common.image" -}}
 {{- $registryName := .image.registry }}
 {{- $repositoryName := .image.repository }}
 {{- $tag := .image.tag }}
@@ -117,6 +117,7 @@ imagePullSecrets:
 {{- end }}
 {{- end }}
 {{- end -}}
+
 {{/*
 Check if there are any users with inline passwords
 */}}
@@ -140,6 +141,9 @@ Validate auth configuration
   {{- end }}
   {{- if .Values.auth.aclUsers }}
     {{- $hasUsersExistingSecret := .Values.auth.usersExistingSecret }}
+    {{- if not (hasKey .Values.auth.aclUsers "default") }}
+      {{- fail "The 'default' user must be defined in auth.aclUsers when authentication is enabled. Without it, anyone can access the database without credentials." }}
+    {{- end }}
     {{- range $username, $user := .Values.auth.aclUsers }}
       {{- if not $user.permissions }}
         {{- fail (printf "User '%s' in auth.aclUsers must have a 'permissions' field" $username) }}
@@ -154,6 +158,74 @@ Validate auth configuration
   {{- end }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Headless service name for replication
+*/}}
+{{- define "valkey.headlessServiceName" -}}
+{{ include "valkey.fullname" . }}-headless
+{{- end -}}
+
+{{/*
+Validate replica persistence configuration
+*/}}
+{{- define "valkey.validateReplicaPersistence" -}}
+{{- if .Values.replica.enabled }}
+  {{- if not .Values.replica.persistence.size }}
+    {{- fail "Replica mode requires persistent storage. Please set replica.persistence.size (e.g., '5Gi')" }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Validate replica authentication configuration
+*/}}
+{{- define "valkey.validateReplicaAuth" -}}
+{{- if and .Values.replica.enabled .Values.auth.enabled }}
+  {{- if not (hasKey .Values.auth.aclUsers .Values.replica.replicationUser) }}
+    {{- fail (printf "Replication user '%s' (replica.replicationUser) must be defined in auth.aclUsers. The chart requires this to retrieve the password for replica authentication." .Values.replica.replicationUser) }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Render the Valkey server container health probes (startupProbe, livenessProbe,
+readinessProbe). Each probe is gated on its own `enabled` flag. When a probe's
+`customProbe` map is set it replaces the default handler and timing entirely;
+otherwise the default valkey-cli ping exec handler (TLS-aware) is emitted with
+whichever timing fields are set on that probe. The command is built as an
+argument list and invokes valkey-cli directly (no shell), with the TLS flags
+appended only when `tls.enabled` is set. Returns nothing when no probe is
+enabled, so callers should guard with `with`.
+*/}}
+{{- define "valkey.healthProbes" -}}
+{{- $cmd := list "valkey-cli" -}}
+{{- if $.Values.tls.enabled -}}
+{{- $cmd = concat $cmd (list "--cacert" (printf "/tls/%s" $.Values.tls.caPublicKey) "--tls") -}}
+{{- end -}}
+{{- $cmd = append $cmd "ping" -}}
+{{- $probes := dict -}}
+{{- range $name := (list "startupProbe" "livenessProbe" "readinessProbe") -}}
+{{- $probe := index $.Values $name -}}
+{{- if $probe -}}
+{{- if $probe.enabled -}}
+{{- if $probe.customProbe -}}
+{{- $probes = set $probes $name $probe.customProbe -}}
+{{- else -}}
+{{- $rendered := dict "exec" (dict "command" $cmd) -}}
+{{- range $field := (list "initialDelaySeconds" "periodSeconds" "timeoutSeconds" "failureThreshold" "successThreshold") -}}
+{{- if hasKey $probe $field -}}{{- $rendered = set $rendered $field (index $probe $field) -}}{{- end -}}
+{{- end -}}
+{{- $probes = set $probes $name $rendered -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if $probes -}}
+{{- toYaml $probes -}}
+{{- end -}}
+{{- end -}}
+
 
 {{/*
 Whether the chart renders the <fullname>-auth Secret: auth on with an inline

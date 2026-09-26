@@ -2,7 +2,7 @@
 # for details and background.
 apiVersion: v2
 # Version of the packaged app
-appVersion: 8.1.4
+appVersion: 9.1.2
 # Make sure your name DOES NOT end in "app" or "-app".
 name: valkey
 # Please describe what the app provides in a sentence or two.
@@ -23,4 +23,4 @@ annotations:
 dependencies:
   - name: valkey
     repository: file://charts/valkey
-    version: 0.8.1
+    version: 0.12.0
