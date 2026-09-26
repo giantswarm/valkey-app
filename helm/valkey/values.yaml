@@ -20,6 +20,10 @@ valkey:
       image:
         registry: gsoci.azurecr.io
         repository: giantswarm/redis_exporter
+        # Renovate follows the tag on the gsoci mirror, which retagger fills
+        # on its own schedule, so a bump is proposed only once it can be
+        # pulled. The vendored subchart's default tag is upstream's.
+        tag: "v1.92.0"
       # Security context for metrics exporter container
       securityContext:
         capabilities:

@@ -1,0 +1,14 @@
+# app-test-suite (ATS >= 1.0) config, consumed by the generated
+# `run-tests-with-ats` CircleCI job (execute-chart-tests). The job creates the
+# kind cluster and hands ATS its kubeconfig.
+#
+# Smoke: ATS installs the packaged chart with tests/ats/values.yaml, the shape
+# the agent platform deploys as muster-valkey (auth on with a default user,
+# a data volume, Recreate, the metrics exporter on), and tests/ats asserts that
+# Valkey comes up and that the exporter reaches it authenticated. An upstream
+# sync PR that breaks either is red before marge would merge it.
+#
+# functional and upgrade stay skipped: there is no second scenario yet.
+app-tests-deploy-namespace: valkey
+app-tests-app-config-file: tests/ats/values.yaml
+skip-steps: [functional,upgrade]

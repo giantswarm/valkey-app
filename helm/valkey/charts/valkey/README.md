@@ -58,35 +58,6 @@ auth:
 
 * If `usersExistingSecret` is defined, passwords from the secret will take precedence over inline passwords.
 
-### Rolling on credential rotation
-
-The init container reads the passwords once, when the pod starts, and the
-metrics exporter reads the default user's password from the same Secret at
-start. The pod template carries a checksum over the credentials beside
-`checksum/initconfig` and `checksum/config`, so a changed password restarts
-the pod:
-
-* With inline passwords or `aclConfig` the chart renders the `<fullname>-auth`
-  Secret; `checksum/auth-secret` is the SHA-256 of that Secret's data and
-  follows every change of those values.
-* With `usersExistingSecret` the chart cannot read the Secret;
-  `checksum/users-secret` is `auth.usersExistingSecretChecksum` verbatim.
-  Change it in the same change that rotates the Secret (a hash over the new
-  data, a counter, a date). A Flux `HelmRelease` can feed it from a key of a
-  Secret or ConfigMap through a `valuesFrom` entry with `targetPath`, so the
-  mark changes with the rotation on its own. While it is empty, a rotation of
-  the existing Secret alone leaves the running Valkey on the old passwords.
-
-```yaml
-auth:
-  enabled: true
-  usersExistingSecret: "my-valkey-users"
-  usersExistingSecretChecksum: "2026-09-23-1"
-  aclUsers:
-    default:
-      permissions: "~* &* +@all"
-```
-
 ### Custom ACL Configuration
 
 You can also provide raw ACL configuration that will be appended after any generated users:
@@ -110,7 +81,6 @@ auth:
 | auth.aclUsers | object | `{}` | |
 | auth.enabled | bool | `false` |  |
 | auth.usersExistingSecret | string | `""` | |
-| auth.usersExistingSecretChecksum | string | `""` | A mark of the existing Secret's revision, rendered verbatim as the pod annotation `checksum/users-secret`; change it with the Secret so the pod restarts |
 | dataStorage.accessModes[0] | string | `"ReadWriteOnce"` |  |
 | dataStorage.annotations | object | `{}` |  |
 | dataStorage.className | string | `""` |  |

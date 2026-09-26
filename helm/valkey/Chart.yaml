@@ -1,6 +1,5 @@
 # See https://docs.giantswarm.io/reference/platform-api/chart-metadata/
 # for details and background.
-
 apiVersion: v2
 # Version of the packaged app
 appVersion: 8.1.4

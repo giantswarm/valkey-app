@@ -1,0 +1,26 @@
+# Values for the ATS smoke (app-tests-app-config-file in .ats/main.yaml): the
+# agent platform's muster-valkey shape. The CiliumNetworkPolicy, the VPA and the
+# PodMonitor are off because a bare kind cluster serves none of their CRDs; the
+# platform turns them off as well.
+ciliumNetworkPolicy:
+  enabled: false
+vpa:
+  enabled: false
+valkey:
+  fullnameOverride: muster-valkey
+  deploymentStrategy: Recreate
+  auth:
+    enabled: true
+    aclUsers:
+      default:
+        permissions: "~* &* +@all"
+        password: ats-smoke-password
+  dataStorage:
+    enabled: true
+    requestedSize: 1Gi
+  valkeyConfig: |
+    maxmemory 64mb
+    maxmemory-policy volatile-lru
+  metrics:
+    podMonitor:
+      enabled: false

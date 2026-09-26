@@ -1,10 +1,13 @@
 // Repo-owned Renovate rules, extended last from the generated renovate.json5.
 {
-  packageRules: [
-    {
-      description: 'The vendored subchart defaults the metrics exporter to ghcr.io, but the wrapper values pull it from the gsoci mirror, which retagger fills on its own schedule. Look the tag up on the mirror, so a bump is proposed only once the image it ships can be pulled.',
-      matchDepNames: ['ghcr.io/oliver006/redis_exporter'],
-      overridePackageName: 'gsoci.azurecr.io/giantswarm/redis_exporter',
-    },
+  // helm/valkey/charts/valkey is upstream's published chart, re-vendored by
+  // the upstream sync (vendir.yml): Renovate bumps the version there, never a
+  // file in the vendored tree. ignorePaths replaces the preset's list, so its
+  // entries are repeated.
+  ignorePaths: [
+    '.github/workflows/zz_generated.*',
+    '.github/workflows/codeql-analysis.yml',
+    '.github/workflows/pre_commit_*.yaml',
+    'helm/valkey/charts/**',
   ],
 }
