@@ -18,6 +18,7 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| enabled | bool | `true` | Read by a parent chart that lists valkey as a dependency with `condition: valkey.enabled` (giantswarm-repo-manager, the fleet bases): Helm hands the subchart the key it switched on, and the closed schema would refuse it. This chart itself does not read it. |
 | valkey.image.registry | string | `"gsoci.azurecr.io"` |  |
 | valkey.image.repository | string | `"giantswarm/valkey"` |  |
 | valkey.metrics.enabled | bool | `true` |  |
