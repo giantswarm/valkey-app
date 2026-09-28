@@ -6,6 +6,12 @@
 #   https://docs.giantswarm.io/tutorials/fleet-management/app-platform/app-configuration/#basic-values-merging-example
 #
 
+# -- Read by a parent chart that lists valkey as a dependency with
+# `condition: valkey.enabled` (giantswarm-repo-manager, the fleet bases): Helm
+# hands the subchart the key it switched on, and the closed schema would refuse
+# it. This chart itself does not read it.
+enabled: true
+
 # The upstream subchart's values, validated by its own values.schema.json:
 # the wrapper schema leaves the block open instead of mirroring it.
 valkey:  # @schema skipProperties: true; additionalProperties: true
