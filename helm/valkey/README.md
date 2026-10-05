@@ -24,7 +24,7 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 | valkey.metrics.enabled | bool | `true` |  |
 | valkey.metrics.exporter.image.registry | string | `"gsoci.azurecr.io"` |  |
 | valkey.metrics.exporter.image.repository | string | `"giantswarm/redis_exporter"` |  |
-| valkey.metrics.exporter.image.tag | string | `"v1.92.0"` |  |
+| valkey.metrics.exporter.image.tag | string | `"v1.93.0"` |  |
 | valkey.metrics.exporter.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | valkey.metrics.exporter.securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | valkey.metrics.exporter.securityContext.runAsNonRoot | bool | `true` |  |
