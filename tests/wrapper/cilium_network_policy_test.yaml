@@ -1,0 +1,129 @@
+suite: cilium network policy
+templates:
+  - templates/cilium-network-policy.yaml
+release:
+  name: mcp-kubernetes-valkey
+  namespace: mcp-kubernetes
+tests:
+  - it: admits the release's namespace on the Valkey port and alloy-metrics on the exporter port by default
+    asserts:
+      - isKind:
+          of: CiliumNetworkPolicy
+      - equal:
+          path: spec.ingress
+          value:
+            - fromEndpoints:
+                - matchLabels:
+                    io.kubernetes.pod.namespace: mcp-kubernetes
+              toPorts:
+                - ports:
+                    - port: "6379"
+                      protocol: TCP
+            - fromEndpoints:
+                - matchLabels:
+                    app.kubernetes.io/instance: alloy-metrics
+                    io.kubernetes.pod.namespace: kube-system
+              toPorts:
+                - ports:
+                    - port: "9121"
+                      protocol: TCP
+            - fromEntities:
+                - host
+
+  - it: renders no cluster-wide rule
+    asserts:
+      - notContains:
+          path: spec.ingress
+          content:
+            fromEntities:
+              - cluster
+            toPorts:
+              - ports:
+                  - port: "6379"
+                    protocol: TCP
+      - notContains:
+          path: spec.ingress
+          content:
+            fromEntities:
+              - cluster
+            toPorts:
+              - ports:
+                  - port: "9121"
+                    protocol: TCP
+
+  - it: keeps the endpoint selector and the DNS egress
+    asserts:
+      - equal:
+          path: spec.endpointSelector.matchLabels
+          value:
+            app.kubernetes.io/name: valkey
+            app.kubernetes.io/instance: mcp-kubernetes-valkey
+      - lengthEqual:
+          path: spec.egress
+          count: 1
+
+  - it: narrows the clients to a consumer's pods
+    set:
+      ciliumNetworkPolicy.ingress.clients:
+        - namespace: ""
+          matchLabels:
+            app.kubernetes.io/name: mcp-kubernetes
+    asserts:
+      - equal:
+          path: spec.ingress[0].fromEndpoints
+          value:
+            - matchLabels:
+                app.kubernetes.io/name: mcp-kubernetes
+                io.kubernetes.pod.namespace: mcp-kubernetes
+
+  - it: adds the additional peers on the Valkey port only
+    set:
+      ciliumNetworkPolicy.ingress.additionalPeers:
+        - namespace: agent-platform
+          matchLabels:
+            app.kubernetes.io/name: muster
+    asserts:
+      - equal:
+          path: spec.ingress[0].fromEndpoints
+          value:
+            - matchLabels:
+                io.kubernetes.pod.namespace: mcp-kubernetes
+            - matchLabels:
+                app.kubernetes.io/name: muster
+                io.kubernetes.pod.namespace: agent-platform
+      - equal:
+          path: spec.ingress[0].toPorts[0].ports[0].port
+          value: "6379"
+      - lengthEqual:
+          path: spec.ingress[1].fromEndpoints
+          count: 1
+
+  - it: admits no client without clients or peers
+    set:
+      ciliumNetworkPolicy.ingress.clients: []
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 2
+      - equal:
+          path: spec.ingress[0].toPorts[0].ports[0].port
+          value: "9121"
+
+  - it: drops the scraper rule while metrics are off
+    set:
+      valkey.metrics.enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 2
+      - equal:
+          path: spec.ingress[1].fromEntities
+          value:
+            - host
+
+  - it: renders nothing while disabled
+    set:
+      ciliumNetworkPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
