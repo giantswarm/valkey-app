@@ -88,6 +88,31 @@ valkey:  # @schema skipProperties: true; additionalProperties: true
 
 ciliumNetworkPolicy:
   enabled: true
+  # Ingress to the store. Cilium policies are additive, so an open rule here
+  # (the cluster entity) could not be narrowed by the consumer's own policies:
+  # the policy admits only the peers below. Each peer is a namespace and the
+  # labels of its pods; an empty namespace is the release's namespace, empty
+  # matchLabels every pod of that namespace. The kubelet's probes (the host
+  # entity) are admitted on every port.
+  ingress:
+    # The consumers admitted on the Valkey port: by default every pod of the
+    # release's namespace, where a consumer deploys its store beside itself.
+    clients:  # @schema item: object; itemProperties: {"namespace": {"type": "string"}, "matchLabels": {"type": "object", "additionalProperties": {"type": "string"}}}
+      - namespace: ""
+        matchLabels: {}
+    # The metrics collectors admitted on the exporter port: the observability
+    # platform's alloy-metrics by default.
+    metricsScrapers:  # @schema item: object; itemRequired: [namespace, matchLabels]; itemProperties: {"namespace": {"type": "string", "minLength": 1}, "matchLabels": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}}}
+      - namespace: kube-system
+        matchLabels:
+          app.kubernetes.io/instance: alloy-metrics
+    # Further clients admitted on the Valkey port, e.g. a consumer in another
+    # namespace. Example:
+    #   additionalPeers:
+    #     - namespace: my-app
+    #       matchLabels:
+    #         app.kubernetes.io/name: my-app
+    additionalPeers: []  # @schema item: object; itemRequired: [namespace, matchLabels]; itemProperties: {"namespace": {"type": "string", "minLength": 1}, "matchLabels": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}}}
 
 vpa:
   enabled: true

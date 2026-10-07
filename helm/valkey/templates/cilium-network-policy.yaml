@@ -1,4 +1,18 @@
-{{ if .Values.ciliumNetworkPolicy.enabled }}
+{{- /*
+The store's network policy. Egress: DNS. Ingress: only the store's consumers.
+Cilium policies are additive, so an open rule here (the cluster entity) could
+not be narrowed by any other policy. The policy admits:
+
+  - ciliumNetworkPolicy.ingress.clients (by default every pod of the release's
+    namespace) and ciliumNetworkPolicy.ingress.additionalPeers on the Valkey
+    port;
+  - ciliumNetworkPolicy.ingress.metricsScrapers on the exporter port while
+    metrics are on;
+  - the kubelet's probes on every port: they arrive from the host entity.
+*/ -}}
+{{- if .Values.ciliumNetworkPolicy.enabled }}
+{{- $ingress := .Values.ciliumNetworkPolicy.ingress }}
+{{- $peers := concat ($ingress.clients | default list) ($ingress.additionalPeers | default list) }}
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
@@ -30,18 +44,35 @@ spec:
             - port: "53"
               protocol: TCP
   ingress:
-    # Allow Valkey client connections
-    - fromEntities:
-      - cluster
+    {{- if $peers }}
+    # Valkey clients
+    - fromEndpoints:
+        {{- range $peers }}
+        - matchLabels:
+            {{- with .matchLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            io.kubernetes.pod.namespace: {{ .namespace | default $.Release.Namespace }}
+        {{- end }}
       toPorts:
-      - ports:
-        - port: "6379"
-          protocol: TCP
-    # Allow Prometheus metrics scraping
-    - fromEntities:
-      - cluster
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    {{- end }}
+    {{- if and .Values.valkey.metrics.enabled $ingress.metricsScrapers }}
+    # Prometheus metrics scraping
+    - fromEndpoints:
+        {{- range $ingress.metricsScrapers }}
+        - matchLabels:
+            {{- toYaml .matchLabels | nindent 12 }}
+            io.kubernetes.pod.namespace: {{ .namespace }}
+        {{- end }}
       toPorts:
-      - ports:
-        - port: "9121"
-          protocol: TCP
-{{ end }}
+        - ports:
+            - port: "9121"
+              protocol: TCP
+    {{- end }}
+    # The kubelet's probes
+    - fromEntities:
+        - host
+{{- end }}
