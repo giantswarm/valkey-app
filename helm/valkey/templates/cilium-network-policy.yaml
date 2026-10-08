@@ -8,11 +8,14 @@ not be narrowed by any other policy. The policy admits:
     port;
   - ciliumNetworkPolicy.ingress.metricsScrapers on the exporter port while
     metrics are on;
+  - both with Cilium mutual authentication when
+    ciliumNetworkPolicy.ingress.authentication.mode is set;
   - the kubelet's probes on every port: they arrive from the host entity.
 */ -}}
 {{- if .Values.ciliumNetworkPolicy.enabled }}
 {{- $ingress := .Values.ciliumNetworkPolicy.ingress }}
 {{- $peers := concat ($ingress.clients | default list) ($ingress.additionalPeers | default list) }}
+{{- $authMode := dig "authentication" "mode" "" $ingress }}
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
@@ -54,6 +57,10 @@ spec:
             {{- end }}
             io.kubernetes.pod.namespace: {{ .namespace | default $.Release.Namespace }}
         {{- end }}
+      {{- with $authMode }}
+      authentication:
+        mode: {{ . | quote }}
+      {{- end }}
       toPorts:
         - ports:
             - port: "6379"
@@ -67,6 +74,10 @@ spec:
             {{- toYaml .matchLabels | nindent 12 }}
             io.kubernetes.pod.namespace: {{ .namespace }}
         {{- end }}
+      {{- with $authMode }}
+      authentication:
+        mode: {{ . | quote }}
+      {{- end }}
       toPorts:
         - ports:
             - port: "9121"
