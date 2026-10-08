@@ -95,6 +95,13 @@ ciliumNetworkPolicy:
   # matchLabels every pod of that namespace. The kubelet's probes (the host
   # entity) are admitted on every port.
   ingress:
+    # Cilium mutual authentication for the fromEndpoints rules below: `required`
+    # on a cluster whose Cilium runs mutual authentication (SPIFFE/SPIRE) and
+    # whose admission policy demands it on every pod-to-pod rule, `disabled` to
+    # say so explicitly; empty renders the rules without an authentication
+    # field. The kubelet's probes (the host entity) never authenticate.
+    authentication:
+      mode: ""  # @schema enum: ["", "disabled", "required"]
     # The consumers admitted on the Valkey port: by default every pod of the
     # release's namespace, where a consumer deploys its store beside itself.
     clients:  # @schema item: object; itemProperties: {"namespace": {"type": "string"}, "matchLabels": {"type": "object", "additionalProperties": {"type": "string"}}}

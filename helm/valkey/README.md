@@ -44,6 +44,7 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 | valkey.initResources.requests.cpu | string | `"50m"` |  |
 | valkey.initResources.requests.memory | string | `"64Mi"` |  |
 | ciliumNetworkPolicy.enabled | bool | `true` |  |
+| ciliumNetworkPolicy.ingress.authentication.mode | string | `""` |  |
 | ciliumNetworkPolicy.ingress.clients[0].namespace | string | `""` |  |
 | ciliumNetworkPolicy.ingress.clients[0].matchLabels | object | `{}` |  |
 | ciliumNetworkPolicy.ingress.metricsScrapers[0].namespace | string | `"kube-system"` |  |

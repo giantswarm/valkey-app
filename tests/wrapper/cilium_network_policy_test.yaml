@@ -127,3 +127,34 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: renders no authentication field by default
+    asserts:
+      - notExists:
+          path: spec.ingress[0].authentication
+      - notExists:
+          path: spec.ingress[1].authentication
+
+  - it: requires mutual authentication on every fromEndpoints rule and never on the host rule
+    set:
+      ciliumNetworkPolicy.ingress.authentication.mode: required
+      ciliumNetworkPolicy.ingress.additionalPeers:
+        - namespace: agent-platform
+          matchLabels:
+            app.kubernetes.io/name: muster
+    asserts:
+      - equal:
+          path: spec.ingress[0].authentication.mode
+          value: required
+      - lengthEqual:
+          path: spec.ingress[0].fromEndpoints
+          count: 2
+      - equal:
+          path: spec.ingress[1].authentication.mode
+          value: required
+      - equal:
+          path: spec.ingress[2].fromEntities
+          value:
+            - host
+      - notExists:
+          path: spec.ingress[2].authentication
