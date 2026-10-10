@@ -3,13 +3,13 @@
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: {{ include "name" . }}-vpa
+  name: {{ include "fullname" . }}-vpa
   labels:
     {{- include "labels.common" . | nindent 4 }}
 spec:
   resourcePolicy:
     containerPolicies:
-    - containerName: 'valkey'
+    - containerName: {{ include "fullname" . | quote }}
     {{- if .Values.vpa.containerPolicies }}
       {{- with .Values.vpa.containerPolicies -}}
         {{ tpl (toYaml .) $ | nindent 6 }}
@@ -18,7 +18,7 @@ spec:
   targetRef:
     apiVersion: "apps/v1"
     kind:       Deployment
-    name:       {{ .Release.Name }}-valkey
+    name:       {{ include "fullname" . }}
   updatePolicy:
     updateMode: Auto
 {{- end -}}

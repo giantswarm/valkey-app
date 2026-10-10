@@ -7,6 +7,25 @@ Expand the name of the chart.
 {{- end -}}
 
 {{/*
+The store's fullname: exactly what the valkey subchart's "valkey.fullname"
+yields for the same release, so the wrapper's objects carry the name of the
+workload they belong to and two releases in one namespace never collide.
+*/}}
+{{- define "fullname" -}}
+{{- $sub := .Values.valkey | default dict -}}
+{{- if $sub.fullnameOverride -}}
+{{- $sub.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "valkey" $sub.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label. A label value is at
 most 63 characters and begins and ends alphanumeric: the cut of a long version
 (a branch build's <version>-dev.<branch>.<date>.<time>.<sha>, or the
