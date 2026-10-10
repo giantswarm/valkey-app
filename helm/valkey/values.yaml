@@ -68,23 +68,33 @@ valkey:  # @schema skipProperties: true; additionalProperties: true
       extraLabels:
         observability.giantswarm.io/tenant: giantswarm
 
-  # Resource limits/requests for Valkey
+  # Resource limits/requests for Valkey. Every container that mounts an
+  # emptyDir sets ephemeral-storage requests and limits (Kyverno's
+  # require-emptydir-requests-and-limits policy): the memory-backed ACL volume
+  # with auth on, and /data while `dataStorage` provides no volume. There
+  # Valkey writes its snapshots, up to the dataset (the memory limit) plus the
+  # temporary file of a save, so the limit is twice the memory limit.
   resources:
     limits:
       cpu: 500m
       memory: 512Mi
+      ephemeral-storage: 1Gi
     requests:
       cpu: 100m
       memory: 128Mi
+      ephemeral-storage: 128Mi
 
-  # Resource limits/requests for init container
+  # Resource limits/requests for init container. It writes the generated
+  # valkey.conf, its log and the ACL file: a few KiB.
   initResources:
     limits:
       cpu: 100m
       memory: 128Mi
+      ephemeral-storage: 64Mi
     requests:
       cpu: 50m
       memory: 64Mi
+      ephemeral-storage: 16Mi
 
 ciliumNetworkPolicy:
   enabled: true
