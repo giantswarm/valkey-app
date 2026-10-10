@@ -1,0 +1,105 @@
+suite: the wrapper's objects carry the store's fullname
+templates:
+  - templates/cilium-network-policy.yaml
+  - templates/vpa.yaml
+  - charts/valkey/templates/deploy_valkey.yaml
+  # Included by the Deployment's checksum annotations.
+  - charts/valkey/templates/init_config.yaml
+  - charts/valkey/templates/configmap.yaml
+capabilities:
+  apiVersions:
+    - autoscaling.k8s.io/v1
+tests:
+  - it: names the policy and the VPA's target after the release when it contains the chart name
+    release:
+      name: muster-valkey
+      namespace: muster
+    asserts:
+      - equal:
+          path: metadata.name
+          value: muster-valkey
+        template: templates/cilium-network-policy.yaml
+      - equal:
+          path: metadata.name
+          value: muster-valkey-vpa
+        template: templates/vpa.yaml
+      - equal:
+          path: spec.targetRef.name
+          value: muster-valkey
+        template: templates/vpa.yaml
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].containerName
+          value: muster-valkey
+        template: templates/vpa.yaml
+      - equal:
+          path: metadata.name
+          value: muster-valkey
+        template: charts/valkey/templates/deploy_valkey.yaml
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: muster-valkey
+        template: charts/valkey/templates/deploy_valkey.yaml
+
+  - it: suffixes the chart name when the release name does not contain it
+    release:
+      name: foo
+      namespace: foo
+    asserts:
+      - equal:
+          path: metadata.name
+          value: foo-valkey
+        template: templates/cilium-network-policy.yaml
+      - equal:
+          path: metadata.name
+          value: foo-valkey-vpa
+        template: templates/vpa.yaml
+      - equal:
+          path: spec.targetRef.name
+          value: foo-valkey
+        template: templates/vpa.yaml
+      - equal:
+          path: spec.resourcePolicy.containerPolicies[0].containerName
+          value: foo-valkey
+        template: templates/vpa.yaml
+      - equal:
+          path: metadata.name
+          value: foo-valkey
+        template: charts/valkey/templates/deploy_valkey.yaml
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: foo-valkey
+        template: charts/valkey/templates/deploy_valkey.yaml
+
+  - it: keeps the name valkey for a release named valkey
+    release:
+      name: valkey
+      namespace: muster
+    asserts:
+      - equal:
+          path: metadata.name
+          value: valkey
+        template: templates/cilium-network-policy.yaml
+      - equal:
+          path: spec.targetRef.name
+          value: valkey
+        template: templates/vpa.yaml
+
+  - it: follows the subchart's fullnameOverride
+    release:
+      name: foo
+      namespace: foo
+    set:
+      valkey.fullnameOverride: store
+    asserts:
+      - equal:
+          path: metadata.name
+          value: store
+        template: templates/cilium-network-policy.yaml
+      - equal:
+          path: spec.targetRef.name
+          value: store
+        template: templates/vpa.yaml
+      - equal:
+          path: metadata.name
+          value: store
+        template: charts/valkey/templates/deploy_valkey.yaml
