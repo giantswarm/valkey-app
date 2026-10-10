@@ -1,0 +1,89 @@
+suite: ephemeral storage on the containers that mount an emptyDir
+templates:
+  - charts/valkey/templates/deploy_valkey.yaml
+  - charts/valkey/templates/statefulset.yaml
+  # Included by the workloads' checksum annotations.
+  - charts/valkey/templates/init_config.yaml
+  - charts/valkey/templates/configmap.yaml
+release:
+  name: muster-valkey
+  namespace: agent-platform
+tests:
+  - it: sets ephemeral-storage requests and limits on the init container and Valkey by default
+    template: charts/valkey/templates/deploy_valkey.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: valkey-data
+            emptyDir: {}
+      - equal:
+          path: spec.template.spec.initContainers[0].resources
+          value:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 64Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              ephemeral-storage: 16Mi
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 128Mi
+
+  - it: keeps them with auth on, where the ACL volume is a memory-backed emptyDir
+    template: charts/valkey/templates/deploy_valkey.yaml
+    set:
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+          password: unit-test-password
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: valkey-acl
+            emptyDir:
+              medium: Memory
+      - exists:
+          path: spec.template.spec.initContainers[0].resources.limits.ephemeral-storage
+      - exists:
+          path: spec.template.spec.initContainers[0].resources.requests.ephemeral-storage
+      - exists:
+          path: spec.template.spec.containers[0].resources.limits.ephemeral-storage
+      - exists:
+          path: spec.template.spec.containers[0].resources.requests.ephemeral-storage
+
+  - it: sets them on the replicated StatefulSet's containers as well
+    template: charts/valkey/templates/statefulset.yaml
+    set:
+      valkey.replica.enabled: true
+      valkey.replica.persistence.size: 1Gi
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers:
+        default:
+          permissions: "~* &* +@all"
+          password: unit-test-password
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - exists:
+          path: spec.template.spec.initContainers[0].resources.limits.ephemeral-storage
+      - exists:
+          path: spec.template.spec.initContainers[0].resources.requests.ephemeral-storage
+      - exists:
+          path: spec.template.spec.containers[0].resources.limits.ephemeral-storage
+      - exists:
+          path: spec.template.spec.containers[0].resources.requests.ephemeral-storage

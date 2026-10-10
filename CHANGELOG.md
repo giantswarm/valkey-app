@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The init container and Valkey set ephemeral-storage requests and limits by default (`valkey.initResources`, `valkey.resources`). Both mount emptyDir volumes without a `sizeLimit`, the memory-backed ACL volume and `/data` while `valkey.dataStorage` provides no volume, which Kyverno's `require-emptydir-requests-and-limits` policy reported for every release of the chart.
 - The CiliumNetworkPolicy can carry Cilium mutual authentication: `ciliumNetworkPolicy.ingress.authentication.mode` (`required` or `disabled`) is written into every `fromEndpoints` rule, for a cluster whose admission policy demands it on pod-to-pod rules; the kubelet's host rule never carries one. Empty by default: the render is unchanged.
 - The CiliumNetworkPolicy no longer admits the whole cluster on the Valkey and exporter ports, which no consumer's policy could narrow. The Valkey port admits `ciliumNetworkPolicy.ingress.clients` (default: every pod of the release's namespace) and `ciliumNetworkPolicy.ingress.additionalPeers`; the exporter port admits `ciliumNetworkPolicy.ingress.metricsScrapers` (default: alloy-metrics in `kube-system`) while metrics are on; the kubelet's probes (the host entity) are admitted on every port. A consumer in another namespace is added to `additionalPeers`.
 - The wrapper schema accepts a top-level `auth` block again, as 0.1.x did. 0.2.0 refused the upgrade for installations that set it beside `valkey.auth`. The block has no effect.

@@ -29,9 +29,9 @@ helm-lint: ## Lint the wrapper chart and the vendored subchart.
 helm-test: helm-lint helm-unittest verify-sync ## Run every chart check (what the chart-test CI job runs).
 
 .PHONY: helm-unittest
-helm-unittest: helm-plugin-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper.
+helm-unittest: helm-plugin-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper with its subchart (the wrapper's defaults rendered through the vendored workloads).
 	helm unittest --file '../../../../tests/chart/*_test.yaml' $(SUBCHART)
-	helm unittest --with-subchart=false --file '../../tests/wrapper/*_test.yaml' $(CHART)
+	helm unittest --file '../../tests/wrapper/*_test.yaml' $(CHART)
 
 .PHONY: helm-plugin-unittest
 helm-plugin-unittest:

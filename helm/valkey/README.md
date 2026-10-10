@@ -37,12 +37,16 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 | valkey.metrics.podMonitor.extraLabels."observability.giantswarm.io/tenant" | string | `"giantswarm"` |  |
 | valkey.resources.limits.cpu | string | `"500m"` |  |
 | valkey.resources.limits.memory | string | `"512Mi"` |  |
+| valkey.resources.limits.ephemeral-storage | string | `"1Gi"` |  |
 | valkey.resources.requests.cpu | string | `"100m"` |  |
 | valkey.resources.requests.memory | string | `"128Mi"` |  |
+| valkey.resources.requests.ephemeral-storage | string | `"128Mi"` |  |
 | valkey.initResources.limits.cpu | string | `"100m"` |  |
 | valkey.initResources.limits.memory | string | `"128Mi"` |  |
+| valkey.initResources.limits.ephemeral-storage | string | `"64Mi"` |  |
 | valkey.initResources.requests.cpu | string | `"50m"` |  |
 | valkey.initResources.requests.memory | string | `"64Mi"` |  |
+| valkey.initResources.requests.ephemeral-storage | string | `"16Mi"` |  |
 | ciliumNetworkPolicy.enabled | bool | `true` |  |
 | ciliumNetworkPolicy.ingress.authentication.mode | string | `""` |  |
 | ciliumNetworkPolicy.ingress.clients[0].namespace | string | `""` |  |
