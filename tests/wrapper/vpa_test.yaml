@@ -28,3 +28,15 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+  - it: targets the Deployment of the standalone store
+    asserts:
+      - equal:
+          path: spec.targetRef.kind
+          value: Deployment
+  - it: targets the StatefulSet of the replicated store
+    set:
+      valkey.replica.enabled: true
+    asserts:
+      - equal:
+          path: spec.targetRef.kind
+          value: StatefulSet
