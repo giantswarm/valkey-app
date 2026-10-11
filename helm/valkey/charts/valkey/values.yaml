@@ -41,6 +41,9 @@ podLabels: {}
 # Annotations for the Deployment/StatefulSet resource
 workloadAnnotations: {}
 
+# Old ReplicaSets the Deployment keeps (Kubernetes' own default is 10)
+revisionHistoryLimit: 3
+
 # Common labels to add to all resources (Deployment, Service, ConfigMap, etc.)
 commonLabels: {}
 

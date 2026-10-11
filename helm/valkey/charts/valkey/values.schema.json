@@ -599,6 +599,10 @@
         "valkeyLogLevel": {
             "type": "string"
         },
+        "revisionHistoryLimit": {
+            "type": "integer",
+            "minimum": 0
+        },
         "workloadAnnotations": {
             "type": "object"
         }
