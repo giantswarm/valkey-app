@@ -162,3 +162,19 @@ tests:
       - equal:
           path: spec.template.spec.initContainers[0].imagePullPolicy
           value: Always
+
+  - it: should keep three old ReplicaSets by default
+    template: templates/deploy_valkey.yaml
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 3
+
+  - it: should take the revisionHistoryLimit value
+    set:
+      revisionHistoryLimit: 1
+    template: templates/deploy_valkey.yaml
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 1
