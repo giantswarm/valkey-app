@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Every object of a release carries the owning team's label `application.giantswarm.io/team`, the Deployment or StatefulSet and its pods included, from the one value `valkey.commonLabels`, by default `planeteers`. Before, the subchart's objects carried no team label. The wrapper's policy and VPA read the same value, fall back to the chart's team annotation, and render no empty team label.
+- Every object of a release carries the owning team's label `application.giantswarm.io/team`, the Deployment or StatefulSet and its pods included, from `valkey.commonLabels`, by default `planeteers`, the team of the chart's annotation. Before, the subchart's objects carried no team label. The wrapper's policy and VPA keep the label from the chart's annotation and render none where the annotation is empty, never an empty one.
 - The VerticalPodAutoscaler targets the StatefulSet when `valkey.replica.enabled` is on; before, it targeted a Deployment that the replicated store does not render.
 
 ## [0.4.0] - 2026-10-11

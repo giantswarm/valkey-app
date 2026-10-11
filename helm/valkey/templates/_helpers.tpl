@@ -45,13 +45,12 @@ app: {{ include "name" . | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- /*
-The owning team: valkey.commonLabels carries it onto the subchart's objects,
-the workloads included, and the wrapper's objects read the same value, falling
-back to the chart's team annotation. No label when both are empty.
+The owning team from the chart's annotation, in the form app-build-suite's
+validator C0001 requires; no label where the annotation is empty. The
+subchart's objects take the same team from valkey.commonLabels.
 */}}
-{{- $team := dig "commonLabels" "application.giantswarm.io/team" "" (.Values.valkey | default dict) | default "" }}
-{{- if or $team (index (.Chart.Annotations | default dict) "application.giantswarm.io/team") }}
-application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | coalesce $team | quote }}
+{{- if index (.Chart.Annotations | default dict) "application.giantswarm.io/team" }}
+application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | quote }}
 {{- end }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}

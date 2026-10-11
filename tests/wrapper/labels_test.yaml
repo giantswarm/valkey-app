@@ -47,7 +47,7 @@ tests:
           value: planeteers
         template: charts/valkey/templates/statefulset.yaml
 
-  - it: takes the team from valkey.commonLabels for every object
+  - it: takes the subchart's team from valkey.commonLabels
     set:
       valkey.commonLabels:
         application.giantswarm.io/team: other
@@ -55,26 +55,8 @@ tests:
       - equal:
           path: metadata.labels["application.giantswarm.io/team"]
           value: other
-        template: templates/cilium-network-policy.yaml
+        template: charts/valkey/templates/deploy_valkey.yaml
       - equal:
-          path: metadata.labels["application.giantswarm.io/team"]
-          value: other
-        template: templates/vpa.yaml
-      - equal:
-          path: metadata.labels["application.giantswarm.io/team"]
+          path: spec.template.metadata.labels["application.giantswarm.io/team"]
           value: other
         template: charts/valkey/templates/deploy_valkey.yaml
-
-  - it: falls back to the chart's team annotation on the wrapper's objects
-    set:
-      valkey.commonLabels:
-        application.giantswarm.io/team: ""
-    asserts:
-      - equal:
-          path: metadata.labels["application.giantswarm.io/team"]
-          value: planeteers
-        template: templates/cilium-network-policy.yaml
-      - equal:
-          path: metadata.labels["application.giantswarm.io/team"]
-          value: planeteers
-        template: templates/vpa.yaml
