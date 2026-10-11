@@ -1,0 +1,62 @@
+suite: every object carries the owning team's label, and none an empty one
+templates:
+  - templates/cilium-network-policy.yaml
+  - templates/vpa.yaml
+  - charts/valkey/templates/deploy_valkey.yaml
+  - charts/valkey/templates/statefulset.yaml
+  # Included by the workloads' checksum annotations.
+  - charts/valkey/templates/init_config.yaml
+  - charts/valkey/templates/configmap.yaml
+capabilities:
+  apiVersions:
+    - autoscaling.k8s.io/v1
+release:
+  name: foo
+  namespace: foo
+tests:
+  - it: labels the wrapper's objects and the Deployment and its pods with the owning team
+    asserts:
+      - equal:
+          path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: templates/cilium-network-policy.yaml
+      - equal:
+          path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: templates/vpa.yaml
+      - equal:
+          path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: charts/valkey/templates/deploy_valkey.yaml
+      - equal:
+          path: spec.template.metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: charts/valkey/templates/deploy_valkey.yaml
+
+  - it: labels the StatefulSet and its pods with the owning team
+    set:
+      valkey.replica.enabled: true
+      valkey.replica.persistence.size: 1Gi
+    asserts:
+      - equal:
+          path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: charts/valkey/templates/statefulset.yaml
+      - equal:
+          path: spec.template.metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
+        template: charts/valkey/templates/statefulset.yaml
+
+  - it: takes the subchart's team from valkey.commonLabels
+    set:
+      valkey.commonLabels:
+        application.giantswarm.io/team: other
+    asserts:
+      - equal:
+          path: metadata.labels["application.giantswarm.io/team"]
+          value: other
+        template: charts/valkey/templates/deploy_valkey.yaml
+      - equal:
+          path: spec.template.metadata.labels["application.giantswarm.io/team"]
+          value: other
+        template: charts/valkey/templates/deploy_valkey.yaml

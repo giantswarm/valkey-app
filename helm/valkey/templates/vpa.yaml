@@ -17,7 +17,7 @@ spec:
     {{- end }}
   targetRef:
     apiVersion: "apps/v1"
-    kind:       Deployment
+    kind:       {{ if dig "replica" "enabled" false .Values.valkey }}StatefulSet{{ else }}Deployment{{ end }}
     name:       {{ include "fullname" . }}
   updatePolicy:
     updateMode: {{ .Values.vpa.updateMode | quote }}

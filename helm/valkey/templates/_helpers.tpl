@@ -44,7 +44,14 @@ app: {{ include "name" . | quote }}
 {{ include "labels.selector" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- /*
+The owning team from the chart's annotation, in the form app-build-suite's
+validator C0001 requires; no label where the annotation is empty. The
+subchart's objects take the same team from valkey.commonLabels.
+*/}}
+{{- if index (.Chart.Annotations | default dict) "application.giantswarm.io/team" }}
 application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | quote }}
+{{- end }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}
 

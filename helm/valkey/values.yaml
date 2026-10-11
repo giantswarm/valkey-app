@@ -15,6 +15,12 @@ enabled: true
 # The upstream subchart's values, validated by its own values.schema.json:
 # the wrapper schema leaves the block open instead of mirroring it.
 valkey:  # @schema skipProperties: true; additionalProperties: true
+  # Labels on every object the subchart renders, its Deployment or StatefulSet
+  # and their pods included. The team is the owning team of Chart.yaml's
+  # annotation, which labels the wrapper's own objects.
+  commonLabels:
+    application.giantswarm.io/team: planeteers
+
   # Configuration for the Valkey image
   image:
     # Use Giant Swarm's container registry
