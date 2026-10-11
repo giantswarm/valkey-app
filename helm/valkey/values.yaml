@@ -133,6 +133,10 @@ ciliumNetworkPolicy:
 
 vpa:
   enabled: true
+  # The VPA's update mode. `Initial` sets requests when a pod is created and never
+  # evicts a running one: the store runs a single replica, which an eviction takes
+  # offline. `Recreate` or `Auto` resize a running store by evicting it.
+  updateMode: Initial  # @schema enum: ["Off", "Initial", "Recreate", "InPlaceOrRecreate", "Auto"]
   containerPolicies:
     minAllowed:
       cpu: "50m"

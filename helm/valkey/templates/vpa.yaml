@@ -20,6 +20,6 @@ spec:
     kind:       Deployment
     name:       {{ include "fullname" . }}
   updatePolicy:
-    updateMode: Auto
+    updateMode: {{ .Values.vpa.updateMode | quote }}
 {{- end -}}
 {{- end -}}

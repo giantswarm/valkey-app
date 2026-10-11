@@ -55,5 +55,6 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 | ciliumNetworkPolicy.ingress.metricsScrapers[0].matchLabels."app.kubernetes.io/instance" | string | `"alloy-metrics"` |  |
 | ciliumNetworkPolicy.ingress.additionalPeers | list | `[]` |  |
 | vpa.enabled | bool | `true` |  |
+| vpa.updateMode | string | `"Initial"` |  |
 | vpa.containerPolicies.minAllowed.cpu | string | `"50m"` |  |
 | auth | object | `{}` |  |
