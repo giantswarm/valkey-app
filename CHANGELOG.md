@@ -7,21 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-11
+
+### Added
+
+- The Deployment keeps `valkey.revisionHistoryLimit` old ReplicaSets, by default 3 (Kubernetes' own default is 10).
+
+## [0.3.7] - 2026-10-11
+
 ### Changed
 
 - The VerticalPodAutoscaler's update mode is `vpa.updateMode`, by default `Initial` (before: `Auto`). The VPA sets requests when a pod is created and no longer evicts the running single-replica store to resize it, which took the store offline until it restarted. `Recreate`, `InPlaceOrRecreate` or `Auto` restore resizing a running store; `Off` only records recommendations.
-- The vendored subchart is upstream's published chart (`https://valkey.io/valkey-helm/`, vendir `helmChart`), which Renovate follows, and the Giant Swarm delta lives in `sync/patches/`, re-applied by `make update-chart` after every `vendir sync`. `make verify-sync` fails when the tree is not the pinned chart plus the patches. The rendered chart is unchanged.
-- The metrics exporter's tag is pinned in the wrapper's values on the gsoci mirror, not in the vendored values.
-- The unit tests moved to `tests/chart/`, and an ATS smoke installs the chart with the agent platform's values and checks that the exporter reaches Valkey authenticated.
-- Updated `valkey` to upstream chart 0.12.0, Valkey 9.1.2 (from 8.1.4). With `valkey.auth.enabled`, `valkey.auth.aclUsers` must define the `default` user; the chart refuses to render otherwise, since Valkey would let unauthenticated clients in as `default`. The standalone Deployment always runs one replica (`replicaCount` has no effect; replication is the chart's `replica` mode).
+
+## [0.3.6] - 2026-10-10
 
 ### Fixed
 
 - The CiliumNetworkPolicy and the VerticalPodAutoscaler are named by the release's fullname, the name the subchart gives the Deployment, Service and PVC (`<release>-valkey`, or the release name when it contains `valkey`), instead of the chart name `valkey`: a second release of the chart in a namespace no longer renders a second `valkey` policy that Helm refuses to adopt. The VPA (`<fullname>-vpa`) targets the Deployment and container the subchart renders; before, it targeted `<release>-valkey` and the container `valkey`, which never rendered for a release whose name contains `valkey`. An existing release gets its policy and VPA recreated under the new names in the same upgrade; a release named `valkey` keeps the policy name `valkey`. The selector labels are unchanged.
+
+## [0.3.5] - 2026-10-10
+
+### Fixed
+
 - The init container and Valkey set ephemeral-storage requests and limits by default (`valkey.initResources`, `valkey.resources`). Both mount emptyDir volumes without a `sizeLimit`, the memory-backed ACL volume and `/data` while `valkey.dataStorage` provides no volume, which Kyverno's `require-emptydir-requests-and-limits` policy reported for every release of the chart.
+
+## [0.3.4] - 2026-10-08
+
+### Fixed
+
 - The CiliumNetworkPolicy can carry Cilium mutual authentication: `ciliumNetworkPolicy.ingress.authentication.mode` (`required` or `disabled`) is written into every `fromEndpoints` rule, for a cluster whose admission policy demands it on pod-to-pod rules; the kubelet's host rule never carries one. Empty by default: the render is unchanged.
+
+## [0.3.3] - 2026-10-07
+
+### Changed
+
+- Updated the metrics exporter `redis_exporter` to v1.93.0.
+
+### Fixed
+
 - The CiliumNetworkPolicy no longer admits the whole cluster on the Valkey and exporter ports, which no consumer's policy could narrow. The Valkey port admits `ciliumNetworkPolicy.ingress.clients` (default: every pod of the release's namespace) and `ciliumNetworkPolicy.ingress.additionalPeers`; the exporter port admits `ciliumNetworkPolicy.ingress.metricsScrapers` (default: alloy-metrics in `kube-system`) while metrics are on; the kubelet's probes (the host entity) are admitted on every port. A consumer in another namespace is added to `additionalPeers`.
+
+## [0.3.2] - 2026-09-28
+
+### Fixed
+
+- The wrapper schema accepts a top-level `enabled` key, which a parent chart listing valkey as a dependency with `condition: valkey.enabled` hands the chart. The chart itself does not read it.
+
+## [0.3.1] - 2026-09-27
+
+### Changed
+
+- The CI image is `cimg/python` 3.14. The rendered chart is unchanged.
+
+## [0.3.0] - 2026-09-26
+
+### Changed
+
+- Updated `valkey` to upstream chart 0.12.0, Valkey 9.1.2 (from 8.1.4). With `valkey.auth.enabled`, `valkey.auth.aclUsers` must define the `default` user; the chart refuses to render otherwise, since Valkey would let unauthenticated clients in as `default`. The standalone Deployment always runs one replica (`replicaCount` has no effect; replication is the chart's `replica` mode).
+
+## [0.2.1] - 2026-09-26
+
+### Fixed
+
 - The wrapper schema accepts a top-level `auth` block again, as 0.1.x did. 0.2.0 refused the upgrade for installations that set it beside `valkey.auth`. The block has no effect.
+
+## [0.2.0] - 2026-09-26
+
+### Changed
+
+- The vendored subchart is upstream's published chart (`https://valkey.io/valkey-helm/`, vendir `helmChart`), which Renovate follows, and the Giant Swarm delta lives in `sync/patches/`, re-applied by `make update-chart` after every `vendir sync`. `make verify-sync` fails when the tree is not the pinned chart plus the patches. The rendered chart is unchanged.
+- The metrics exporter's tag is pinned in the wrapper's values on the gsoci mirror, not in the vendored values.
+- The unit tests moved to `tests/chart/`, and an ATS smoke installs the chart with the agent platform's values and checks that the exporter reaches Valkey authenticated.
 
 ## [0.1.7] - 2026-09-23
 
@@ -156,7 +212,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add VerticalPodAutoscaler (VPA) support.
 - Enable metrics and PodMonitor for Prometheus monitoring.
 
-[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/giantswarm/valkey-app/compare/v0.3.7...v0.4.0
+[0.3.7]: https://github.com/giantswarm/valkey-app/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/giantswarm/valkey-app/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/giantswarm/valkey-app/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/giantswarm/valkey-app/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/giantswarm/valkey-app/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/giantswarm/valkey-app/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/giantswarm/valkey-app/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/giantswarm/valkey-app/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/giantswarm/valkey-app/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/giantswarm/valkey-app/compare/v0.1.7...v0.2.0
 [0.1.7]: https://github.com/giantswarm/valkey-app/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/giantswarm/valkey-app/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/giantswarm/valkey-app/compare/v0.1.4...v0.1.5
