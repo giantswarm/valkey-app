@@ -37,14 +37,6 @@ most 63 characters and begins and ends alphanumeric: the cut of a long version
 {{- end -}}
 
 {{/*
-The owning team: the subchart's commonLabels carry it onto the workloads, so
-the wrapper's objects read the same value. Empty when it is unset.
-*/}}
-{{- define "team" -}}
-{{- dig "commonLabels" "application.giantswarm.io/team" "" (.Values.valkey | default dict) | default "" -}}
-{{- end -}}
-
-{{/*
 Common labels
 */}}
 {{- define "labels.common" -}}
@@ -52,8 +44,14 @@ app: {{ include "name" . | quote }}
 {{ include "labels.selector" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- with include "team" . }}
-application.giantswarm.io/team: {{ . | quote }}
+{{- /*
+The owning team: valkey.commonLabels carries it onto the subchart's objects,
+the workloads included, and the wrapper's objects read the same value, falling
+back to the chart's team annotation. No label when both are empty.
+*/}}
+{{- $team := dig "commonLabels" "application.giantswarm.io/team" "" (.Values.valkey | default dict) | default "" }}
+{{- if or $team (index (.Chart.Annotations | default dict) "application.giantswarm.io/team") }}
+application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | coalesce $team | quote }}
 {{- end }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}

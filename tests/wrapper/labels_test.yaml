@@ -65,14 +65,16 @@ tests:
           value: other
         template: charts/valkey/templates/deploy_valkey.yaml
 
-  - it: renders no empty team label on the wrapper's objects
+  - it: falls back to the chart's team annotation on the wrapper's objects
     set:
       valkey.commonLabels:
         application.giantswarm.io/team: ""
     asserts:
-      - notExists:
+      - equal:
           path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
         template: templates/cilium-network-policy.yaml
-      - notExists:
+      - equal:
           path: metadata.labels["application.giantswarm.io/team"]
+          value: planeteers
         template: templates/vpa.yaml
