@@ -175,6 +175,16 @@
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "updateMode": {
+                    "type": "string",
+                    "enum": [
+                        "Off",
+                        "Initial",
+                        "Recreate",
+                        "InPlaceOrRecreate",
+                        "Auto"
+                    ]
                 }
             }
         }

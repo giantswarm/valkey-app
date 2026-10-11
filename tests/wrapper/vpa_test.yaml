@@ -1,0 +1,30 @@
+suite: the VPA resizes the store without evicting it by default
+templates:
+  - templates/vpa.yaml
+capabilities:
+  apiVersions:
+    - autoscaling.k8s.io/v1
+tests:
+  - it: sets requests at pod creation and never evicts the running store by default
+    asserts:
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Initial
+  - it: takes the update mode from vpa.updateMode
+    set:
+      vpa.updateMode: Auto
+    asserts:
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Auto
+  - it: refuses an update mode the VPA does not know
+    set:
+      vpa.updateMode: Sometimes
+    asserts:
+      - failedTemplate: {}
+  - it: renders no VPA when vpa.enabled is false
+    set:
+      vpa.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

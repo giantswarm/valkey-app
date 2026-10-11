@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The VerticalPodAutoscaler's update mode is `vpa.updateMode`, by default `Initial` (before: `Auto`). The VPA sets requests when a pod is created and no longer evicts the running single-replica store to resize it, which took the store offline until it restarted. `Recreate`, `InPlaceOrRecreate` or `Auto` restore resizing a running store; `Off` only records recommendations.
 - The vendored subchart is upstream's published chart (`https://valkey.io/valkey-helm/`, vendir `helmChart`), which Renovate follows, and the Giant Swarm delta lives in `sync/patches/`, re-applied by `make update-chart` after every `vendir sync`. `make verify-sync` fails when the tree is not the pinned chart plus the patches. The rendered chart is unchanged.
 - The metrics exporter's tag is pinned in the wrapper's values on the gsoci mirror, not in the vendored values.
 - The unit tests moved to `tests/chart/`, and an ATS smoke installs the chart with the agent platform's values and checks that the exporter reaches Valkey authenticated.
