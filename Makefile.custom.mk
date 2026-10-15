@@ -28,8 +28,11 @@ helm-lint: ## Lint the wrapper chart and the vendored subchart.
 # rule, which keeps its recipe and gains these checks. That recipe finds no
 # suite under helm/ and says so, as the suites live in tests/: tests/chart/
 # asserts on the vendored subchart, which `vendir sync` replaces whole.
+# verify-sync is not a prerequisite: the generated chart-tests workflow runs
+# `make helm-test` on a plain runner with no vendir. The chart-test CircleCI
+# job runs both.
 .PHONY: helm-test
-helm-test: helm-lint helm-unittest verify-sync
+helm-test: helm-lint helm-unittest
 
 .PHONY: helm-unittest
 helm-unittest: install-helm-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper with its subchart (the wrapper's defaults rendered through the vendored workloads).

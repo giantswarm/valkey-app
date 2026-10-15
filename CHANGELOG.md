@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `make helm-test` takes the helm-unittest version from the generated `Makefile.gen.app.mk` (giantswarm/devctl#2570) in place of a second pin here, and the generated installer replaces an installed plugin of a different version. The suites stay in `tests/`, outside `helm/`, as `tests/chart/` asserts on the vendored subchart that `vendir sync` replaces whole; `helm lint`, both suites and `make verify-sync` run as before.
+- `make helm-test` takes the helm-unittest version from the generated `Makefile.gen.app.mk` (giantswarm/devctl#2570) in place of a second pin here, and the generated installer replaces an installed plugin of a different version. The suites stay in `tests/`, outside `helm/`, as `tests/chart/` asserts on the vendored subchart that `vendir sync` replaces whole; `helm lint` and both suites run as before. `make verify-sync` is no longer a `helm-test` prerequisite, as the generated `chart-tests` workflow runs `make helm-test` on a runner with no vendir; the `chart-test` CircleCI job runs it beside `make helm-test`, on a helm new enough for the pinned plugin.
 
 ### Fixed
 
