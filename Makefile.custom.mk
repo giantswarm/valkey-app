@@ -4,7 +4,6 @@
 # `make update-chart` needs no APPLICATION= on the command line.
 APPLICATION := valkey
 
-HELM_UNITTEST_VERSION := 1.0.3
 CHART := helm/$(APPLICATION)
 SUBCHART := $(CHART)/charts/valkey
 
@@ -25,14 +24,14 @@ helm-lint: ## Lint the wrapper chart and the vendored subchart.
 	helm lint $(CHART)
 	helm lint $(SUBCHART)
 
+# Prerequisite-only, no recipe: make merges it into the generated helm-test
+# rule, which keeps its recipe and gains these checks. That recipe finds no
+# suite under helm/ and says so, as the suites live in tests/: tests/chart/
+# asserts on the vendored subchart, which `vendir sync` replaces whole.
 .PHONY: helm-test
-helm-test: helm-lint helm-unittest verify-sync ## Run every chart check (what the chart-test CI job runs).
+helm-test: helm-lint helm-unittest verify-sync
 
 .PHONY: helm-unittest
-helm-unittest: helm-plugin-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper with its subchart (the wrapper's defaults rendered through the vendored workloads).
+helm-unittest: install-helm-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper with its subchart (the wrapper's defaults rendered through the vendored workloads).
 	helm unittest --file '../../../../tests/chart/*_test.yaml' $(SUBCHART)
 	helm unittest --file '../../tests/wrapper/*_test.yaml' $(CHART)
-
-.PHONY: helm-plugin-unittest
-helm-plugin-unittest:
-	@helm plugin list | grep -q '^unittest' || helm plugin install https://github.com/helm-unittest/helm-unittest --version $(HELM_UNITTEST_VERSION)

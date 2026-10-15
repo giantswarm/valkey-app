@@ -102,7 +102,7 @@ The delta, until upstream carries it:
 
 The wrapper pins the metrics exporter's tag on the `gsoci.azurecr.io/giantswarm/redis_exporter` mirror; Renovate follows it there and leaves the vendored chart alone.
 
-`make helm-test` lints both charts, runs the unit tests in `tests/chart/` against the vendored chart and runs `make verify-sync`; the `chart-test` CircleCI job runs it on every branch.
+`make helm-test` lints both charts, runs the unit tests in `tests/chart/` against the vendored chart and those in `tests/wrapper/` against the wrapper, and runs `make verify-sync`; the `chart-test` CircleCI job runs it on every branch.
 
 ## Limitations
 
