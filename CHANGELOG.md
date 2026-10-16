@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `make helm-test` takes the helm-unittest version from the generated `Makefile.gen.app.mk` (giantswarm/devctl#2570) in place of a second pin here, and the generated installer replaces an installed plugin of a different version. The suites stay in `tests/`, outside `helm/`, as `tests/chart/` asserts on the vendored subchart that `vendir sync` replaces whole; `helm lint` and both suites run as before. `make verify-sync` is no longer a `helm-test` prerequisite, as the generated `chart-tests` workflow runs `make helm-test` on a runner with no vendir; the `chart-test` CircleCI job runs it beside `make helm-test`, on a helm new enough for the pinned plugin.
+
 ### Fixed
 
 - Every object of a release carries the owning team's label `application.giantswarm.io/team`, the Deployment or StatefulSet and its pods included, from `valkey.commonLabels`, by default `planeteers`, the team of the chart's annotation. Before, the subchart's objects carried no team label. The wrapper's policy and VPA keep the label from the chart's annotation and render none where the annotation is empty, never an empty one.
