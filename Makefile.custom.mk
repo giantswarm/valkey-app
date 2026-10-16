@@ -26,7 +26,7 @@ helm-lint: ## Lint the wrapper chart and the vendored subchart.
 	helm lint $(SUBCHART)
 
 .PHONY: helm-test
-helm-test: helm-lint helm-unittest verify-sync ## Run every chart check (what the chart-test CI job runs).
+helm-test: helm-lint helm-unittest ## Lint and unit-test both charts; needs only helm (the GitHub chart-tests job runs it). CircleCI adds verify-sync, which needs vendir.
 
 .PHONY: helm-unittest
 helm-unittest: helm-plugin-unittest ## Run the helm-unittest suites: tests/chart/ against the vendored chart, tests/wrapper/ against the wrapper with its subchart (the wrapper's defaults rendered through the vendored workloads).

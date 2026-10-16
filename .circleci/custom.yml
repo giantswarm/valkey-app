@@ -4,8 +4,8 @@
 version: 2.1
 
 jobs:
-  # `make helm-test`: helm lint of the wrapper and the vendored subchart, the
-  # helm-unittest suites in tests/chart/, and `make verify-sync`, which
+  # `make helm-test verify-sync`: helm lint of the wrapper and the vendored
+  # subchart, the helm-unittest suites, and `make verify-sync`, which
   # re-vendors the pinned upstream chart, applies sync/patches and fails when
   # the tree differs (it fetches from the upstream chart repository).
   chart-test:
@@ -31,7 +31,7 @@ jobs:
             vendir version | head -1
       - run:
           name: Run chart tests
-          command: make helm-test
+          command: make helm-test verify-sync
 
 workflows:
   build:
