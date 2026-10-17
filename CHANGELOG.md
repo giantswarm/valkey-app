@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-12
+
 ### Fixed
 
 - Every object of a release carries the owning team's label `application.giantswarm.io/team`, the Deployment or StatefulSet and its pods included, from `valkey.commonLabels`, by default `planeteers`, the team of the chart's annotation. Before, the subchart's objects carried no team label. The wrapper's policy and VPA keep the label from the chart's annotation and render none where the annotation is empty, never an empty one.
@@ -217,7 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add VerticalPodAutoscaler (VPA) support.
 - Enable metrics and PodMonitor for Prometheus monitoring.
 
-[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/giantswarm/valkey-app/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/giantswarm/valkey-app/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/giantswarm/valkey-app/compare/v0.3.7...v0.4.0
 [0.3.7]: https://github.com/giantswarm/valkey-app/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/giantswarm/valkey-app/compare/v0.3.5...v0.3.6
