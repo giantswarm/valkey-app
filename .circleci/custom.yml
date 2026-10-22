@@ -13,7 +13,9 @@ jobs:
       - image: cimg/python:3.15
     resource_class: small
     environment:
-      HELM_VERSION: v3.16.0
+      # The plugin.yaml of the pinned helm-unittest uses platformHooks, which
+      # helm rejects before 3.17.
+      HELM_VERSION: v3.21.4
       VENDIR_VERSION: v0.32.2
       VENDIR_SHA256: f5d3cbbd8135d2d48f4f007b8a933bd60b2a827d68f4001c5d1774392fa7b3f2
     steps:
