@@ -12,7 +12,7 @@ A Giant Swarm app for deploying Valkey (a Redis alternative) on Kubernetes.
 
 | Repository | Name | Version |
 |------------|------|---------|
-| file://charts/valkey | valkey | 0.12.0 |
+| file://charts/valkey | valkey | 0.12.1 |
 
 ## Values
 
