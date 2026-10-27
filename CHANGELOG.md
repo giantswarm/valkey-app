@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `make helm-test` takes the helm-unittest version from the generated `Makefile.gen.app.mk` (giantswarm/devctl#2570) in place of a second pin here, and the generated installer replaces an installed plugin of a different version. `helm lint` and both suites in `tests/` run as before.
+- Updated `valkey` to upstream version `v9.1.3`.
 
 ### Fixed
 
