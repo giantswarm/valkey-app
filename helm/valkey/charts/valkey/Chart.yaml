@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: 9.1.2
+appVersion: 9.1.3
 description: A Helm chart for Kubernetes
 home: https://valkey.io/valkey-helm/
 icon: https://dyltqmyl993wv.cloudfront.net/assets/stacks/valkey/img/valkey-stack-220x234.png
@@ -15,4 +15,4 @@ sources:
 - https://github.com/valkey-io/valkey-helm.git
 - https://valkey.io
 type: application
-version: 0.12.0
+version: 0.12.1
