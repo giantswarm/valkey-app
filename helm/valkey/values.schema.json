@@ -133,6 +133,9 @@
             "type": "boolean",
             "description": "Read by a parent chart that lists valkey as a dependency with `condition: valkey.enabled` (giantswarm-repo-manager, the fleet bases): Helm hands the subchart the key it switched on, and the closed schema would refuse it. This chart itself does not read it."
         },
+        "externalDNSIP": {
+            "type": "string"
+        },
         "gcpProject": {
             "type": "string"
         },
@@ -141,8 +144,21 @@
                 "object",
                 "null"
             ],
-            "description": "Global values shared between all subcharts",
-            "$comment": "Added automatically by 'helm schema' to allow this chart to be used as a Helm dependency, as this schema would otherwise not allow Helm's special 'global' values key."
+            "description": "Global values shared between all subcharts and the platform.",
+            "additionalProperties": true,
+            "properties": {
+                "podSecurityStandards": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "helm": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "managementCluster": {
+            "type": "string"
         },
         "provider": {
             "type": "string"
