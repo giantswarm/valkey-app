@@ -39,7 +39,7 @@ valkey:  # @schema skipProperties: true; additionalProperties: true
         # pulled. The vendored subchart's default tag is upstream's.
         # -- The metrics exporter image tag.
         # @default -- the newest exporter release on the gsoci mirror, kept current by Renovate
-        tag: "v1.96.0"
+        tag: "v1.97.0"
       # Security context for metrics exporter container
       securityContext:
         capabilities:
