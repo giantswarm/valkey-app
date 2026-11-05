@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The chart README no longer prints the metrics exporter image tag. `valkey.metrics.exporter.image.tag` carries a helm-docs `@default`, so a Renovate tag bump no longer changes the README and fails `pre-commit`.
 - `make helm-test` takes the helm-unittest version from the generated `Makefile.gen.app.mk` (giantswarm/devctl#2570) in place of a second pin here, and the generated installer replaces an installed plugin of a different version. `helm lint` and both suites in `tests/` run as before.
 - Updated `valkey` to upstream version `v9.1.3`.
 
