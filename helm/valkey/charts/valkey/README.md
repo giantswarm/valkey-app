@@ -1,117 +1,193 @@
 # valkey
 
-![Version: 0.12.1](https://img.shields.io/badge/Version-0.12.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.3](https://img.shields.io/badge/AppVersion-9.1.3-informational?style=flat-square)
+![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.3](https://img.shields.io/badge/AppVersion-9.1.3-informational?style=flat-square)
 
-A Helm chart for Kubernetes
+Valkey, an open source, high-performance in-memory datastore
+
+> Upgrading from 0.x? The values changed in 1.0; see [UPGRADE.md](UPGRADE.md).
 
 **Homepage:** <https://valkey.io/valkey-helm/>
 
 ## Maintainers
 
-| Name | Url |
-| ---- | --- |
-| raven | [https://github.com/mk-raven] |
-| sgissi | [https://github.com/sgissi] |
-| Bloodraven21 | [https://github.com/Bloodraven21] |
+| Name | Email | Url |
+| ---- | ------ | --- |
+| raven |  | <https://github.com/mk-raven> |
+| sgissi |  | <https://github.com/sgissi> |
+| Bloodraven21 |  | <https://github.com/Bloodraven21> |
+
 ## Source Code
 
 * <https://github.com/valkey-io/valkey-helm.git>
 * <https://valkey.io>
 
-## Deployment Modes
+## Requirements
 
-### Standalone Mode (Default)
+* Valkey 9.0 or later. The default image is a 9.x release; if you pin `image.tag`, pin a 9.x version.
 
-Deploy a single Valkey instance:
+## Quick Start
+
+The chart is published both as a Helm repository and as an OCI artifact.
+
+**Helm repository:**
+
+```bash
+helm repo add valkey https://valkey.io/valkey-helm/
+helm repo update
+helm install valkey valkey/valkey
+```
+
+**OCI registry:**
+
+```bash
+helm install valkey oci://ghcr.io/valkey-io/valkey-helm/valkey --version 1.0.0
+```
+
+The examples below use `valkey/valkey`; replace `valkey/valkey` with `oci://ghcr.io/valkey-io/valkey-helm/valkey --version 1.0.0` to install from the OCI registry.
+Service names assume a release named `valkey`.
+
+These commands are the shortest way to try each mode and run without authentication.
+See [Before Going to Production](#before-going-to-production) for a real deployment.
+
+### Standalone (No replication)
+
+A single Valkey pod. This is the default.
 
 ```bash
 helm install valkey valkey/valkey
 ```
 
-**Services:**
+| Service  | Use         |
+|----------|-------------|
+| `valkey` | Read/write  |
 
-* `valkey`: Master/read-write service
+### Replicated
 
-### Replication Mode
-
-Deploy Valkey with master-replica architecture for read scaling and data redundancy:
+One primary and two replicas by default. Replication requires persistent storage.
 
 ```bash
-helm install valkey valkey/valkey --set replica.enabled=true --set replica.persistence.size=5Gi
+helm install valkey valkey/valkey \
+  --set replica.enabled=true \
+  --set persistence.enabled=true \
+  --set persistence.size=5Gi
 ```
 
-**IMPORTANT**
+| Service           | Use                                     |
+|-------------------|-----------------------------------------|
+| `valkey`          | Read/write, always the primary (pod-0)  |
+| `valkey-read`     | Read-only, load balanced over all pods  |
+| `valkey-headless` | Pod discovery                           |
 
-## Cluster Mode
+The primary is fixed to pod-0: if it fails, writes stop until it comes back.
+Use Sentinel for automatic failover.
 
-This chart does not and will not support **Valkey cluster** mode. Managing a clustered topology is fundamentally different from standalone or replicated deployments, and the operational requirements go well beyond what this chart is designed to handle.
+### Sentinel (High Availability)
 
-For cluster mode, a separate chart is being developed that uses the valkey-operator to deploy and manage clusters. The operator must be installed first.
+Replicated mode plus three Sentinel pods that promote a replica when the primary fails.
+Sentinel always requires its own password.
 
-To follow progress or get involved, see the [weekly meeting wiki](https://github.com/valkey-io/valkey-operator/wiki/Weekly-meeting). 
-
-**Services:**
-
-* `valkey`: Master/write service
-* `valkey-read`: Read service (load-balances across all pods) - optional
-* `valkey-headless`: Headless service for pod discovery
-
-**Write Safety Configuration:**
-
-Ensure data durability by requiring a minimum number of replicas to be in sync before accepting writes:
-
-```yaml
-replica:
-  minReplicasToWrite: 1  # Require at least 1 replica
-  minReplicasMaxLag: 10  # Max 10 seconds replication lag
+```bash
+helm install valkey valkey/valkey \
+  --set replica.enabled=true \
+  --set persistence.enabled=true \
+  --set persistence.size=5Gi \
+  --set sentinel.enabled=true \
+  --set sentinel.password=change-me
 ```
 
-If fewer than `minReplicasToWrite` replicas are available, the master will reject write operations.
+| Service              | Use                                                  |
+|----------------------|------------------------------------------------------|
+| `valkey-sentinel`    | Sentinel, port 26379: ask it for the current primary |
+| `valkey-read`        | Read-only, load balanced over all pods               |
+| `valkey`             | Any pod, not a write endpoint                        |
+| `valkey-headless`    | Pod discovery                                        |
+| `valkey-sentinel-hl` | Sentinel pod discovery                               |
 
-## Storage
+The primary can be any pod, so clients must use a Sentinel-aware library, or the [HAProxy front-end](#haproxy-front-end).
 
-### Standalone Storage
+### Connecting
 
-Persistence is optional. By default, data is stored in an ephemeral volume and lost on pod restart.
+**Standalone and replicated:**
 
-**Enable persistent storage:**
+```bash
+kubectl port-forward svc/valkey 6379:6379
+valkey-cli -h 127.0.0.1 ping
+```
+
+From inside the cluster, connect to `valkey.<namespace>.svc.cluster.local:6379`.
+
+**Sentinel:**
+
+```bash
+kubectl exec valkey-sentinel-0 -- valkey-cli -p 26379 --user sentinel -a change-me \
+  SENTINEL get-master-addr-by-name mymaster
+```
+
+Applications resolve the primary through Sentinel, for example in Python:
+
+```python
+from valkey.sentinel import Sentinel
+
+sentinel = Sentinel(
+    [("valkey-sentinel", 26379)],
+    sentinel_kwargs={"username": "sentinel", "password": "change-me"},
+)
+primary = sentinel.master_for("mymaster")
+primary.set("key", "value")
+```
+
+When `auth.enabled` is set, also pass the Valkey `username` and `password` to `master_for`.
+The notes printed by `helm install` show the commands for your release.
+
+### Uninstalling
+
+```bash
+helm uninstall valkey
+```
+
+In replicated and Sentinel mode the PersistentVolumeClaims are kept; delete them with `kubectl delete pvc -l app.kubernetes.io/instance=valkey` to remove the data.
+In standalone mode the PersistentVolumeClaim is deleted unless `persistence.keepOnUninstall` is set.
+
+## Before Going to Production
+
+* Enable [authentication](#authentication) and keep passwords in a Secret.
+* Size `persistence` for your dataset and pick a `persistence.storageClass`.
+* Enable [TLS](#tls) if traffic leaves a trusted network.
+* Enable a [PodDisruptionBudget](#poddisruptionbudget) and spread pods across nodes or zones with `affinity` or `topologySpreadConstraints`.
+* For Sentinel, keep passwords in Secrets with `auth.usersExistingSecret` and `sentinel.existingSecret`, and spread the Sentinel pods too (see [Sentinel](#sentinel)).
+
+A complete Sentinel values file with authentication is in [examples/ha-sentinel.yaml](examples/ha-sentinel.yaml).
+
+## Upgrading
+
+Breaking changes and migration steps are listed in [UPGRADE.md](UPGRADE.md).
+
+## Configuration
+
+### Persistence
+
+The `persistence` block configures the Valkey data directory (`/data`).
 
 ```yaml
-dataStorage:
+persistence:
   enabled: true
-  requestedSize: 10Gi
-  className: "fast-ssd"  # Optional
+  size: 10Gi
+  storageClass: "fast-ssd"  # Optional
 ```
 
-**Use existing PVC:**
+In standalone mode persistence is optional; without it data lives in an `emptyDir` and is lost whenever the pod is replaced, e.g. on an upgrade or eviction.
+Standalone can also use an existing claim (`persistence.existingClaim`) or a `persistence.hostPath`, and `persistence.keepOnUninstall: true` keeps the PVC on `helm uninstall`.
 
-```yaml
-dataStorage:
-  enabled: true
-  persistentVolumeClaimName: "my-existing-pvc"
-```
+In replicated and Sentinel mode persistence is required and each pod gets its own PVC, named `valkey-data-<statefulset>-<index>`.
+To reuse existing volumes, create claims with those names before installing.
+`existingClaim`, `hostPath` and `keepOnUninstall` do not apply; Helm never deletes these PVCs unless `replica.persistentVolumeClaimRetentionPolicy` says so.
+`accessModes`, `storageClass`, `persistence.labels` and `persistence.annotations` cannot be changed after install.
 
-### Replication Storage
+### Authentication
 
-Persistent storage is **mandatory** in replication mode. Without it, the primary might come up with an empty dataset after a restart, all replicas will synchronize with the empty primary and lose their data. See [Valkey Replication Safety](https://valkey.io/topics/replication/#safety-of-replication-when-primary-has-persistence-turned-off) for details.
+When `auth.enabled` is set, the `default` user must be defined in `auth.aclUsers` or `auth.aclConfig`.
 
-```yaml
-replica:
-  enabled: true
-  persistence:
-    size: 10Gi  # Required
-    storageClass: "fast-ssd"  # Optional
-```
-
-## Authentication
-
-This chart supports ACL-based authentication for Valkey.
-
-**⚠️ IMPORTANT:** When authentication is enabled, the `default` user **MUST** be defined in either `auth.aclUsers` or `auth.aclConfig`. Without a default user, anyone can access the database without credentials.
-
-### Existing Secret (recommended)
-
-Reference an existing Kubernetes secret containing user passwords:
+**Passwords from an existing Secret (recommended):**
 
 ```yaml
 auth:
@@ -120,15 +196,13 @@ auth:
   aclUsers:
     default:
       permissions: "~* &* +@all"
-      # Password will be read from secret key "default" (defaults to username)
+      # Password read from the Secret key "default" (the username)
     readonly:
       permissions: "~* -@all +@read +ping +info"
-      passwordKey: "readonly-pwd"  # Use custom secret key name
+      passwordKey: "readonly-pwd"  # Custom Secret key
 ```
 
-### Inline Passwords
-
-Define users directly in your values file with inline passwords:
+**Inline passwords:**
 
 ```yaml
 auth:
@@ -137,18 +211,11 @@ auth:
     default:
       permissions: "~* &* +@all"
       password: "default-password"
-    readonly:
-      permissions: "~* -@all +@read +ping +info"
-      password: "readonly-password"
 ```
 
-**Note:**
+When `usersExistingSecret` is set, passwords from the Secret take precedence over inline ones.
 
-* If `usersExistingSecret` is defined, passwords from the secret will take precedence over inline passwords.
-
-### Custom ACL Configuration
-
-You can also provide raw ACL configuration that will be appended after any generated users:
+**Raw ACL rules**, appended after the generated users:
 
 ```yaml
 auth:
@@ -158,9 +225,10 @@ auth:
     user guest on nopass ~public:* +@read
 ```
 
-### Replication with Authentication
+The ACL file is regenerated from these values on every pod start: users added with `ACL SETUSER` are lost on restart.
+A user allowed to run `ACL SAVE` or `CONFIG REWRITE`, which `+@all` includes, can overwrite the generated files while the pod runs: give application users narrower permissions, e.g. `+@all -@admin`.
 
-When using ACL authentication in replication mode, replicas need credentials to authenticate to the master:
+**With replication**, replicas authenticate to the primary as `replica.replicationUser`, which must be defined in `auth.aclUsers` with at least `+psync +replconf +ping`:
 
 ```yaml
 auth:
@@ -171,72 +239,136 @@ auth:
       permissions: "~* &* +@all"
     replication-user:
       permissions: "+psync +replconf +ping"
-
 replica:
   enabled: true
-  replicas: 2
-  replicationUser: "replication-user"  # Must be defined in auth.aclUsers
+  replicationUser: "replication-user"
 ```
 
-**Important Notes:**
+### Replication
 
-* `replica.replicationUser` specifies which ACL user replicas use to authenticate
-* This user MUST be defined in `auth.aclUsers` with appropriate permissions
-* Minimum permissions: `+psync +replconf +ping`
+`replica.replicas` counts the Valkey pods, the primary included (default 3).
 
-## Metrics
-
-This chart supports Prometheus metrics collection using the [Redis exporter](https://github.com/oliver006/redis_exporter).
-
-Enable the metrics exporter sidecar:
+To reject writes unless enough replicas are in sync:
 
 ```yaml
-metrics:
-  enabled: true
+replica:
+  minReplicasToWrite: 1  # At least 1 replica connected
+  minReplicasMaxLag: 10  # With at most 10 seconds of lag
 ```
 
-### Prometheus Operator discovery
+`valkey-read` drops a pod once its readiness probe fails, so new connections no longer go to a replica that is still loading its dataset or has stopped answering.
+Connections already open to it stay there until the client reconnects.
+Lower `readinessProbe.periodSeconds` or `readinessProbe.failureThreshold` to take it out faster.
 
-Automated Prometheus discovery using the Prometheus Operator ServiceMonitor:
+### Sentinel
+
+Sentinel requires `replica.enabled`, at least 2 Valkey pods and at least 3 Sentinels (`sentinel.replicas`).
+
+**Authentication:** Sentinel uses two separate credentials, one in each direction.
+
+| Connection         | User                                              | Password                                         |
+|--------------------|---------------------------------------------------|--------------------------------------------------|
+| Clients → Sentinel | `sentinel`                                        | `sentinel.password` or `sentinel.existingSecret` |
+| Sentinel → Valkey  | `sentinel.monitorUser` (only with `auth.enabled`) | That user's password from `auth.aclUsers`        |
+
+Every Sentinel has a single ACL user, `sentinel`, which clients, HAProxy and the Sentinels themselves log in as.
+Its password is required even when `auth.enabled` is off: set `sentinel.password`, or point `sentinel.existingSecret` at a Secret holding it under `sentinel.passwordKey` (default `sentinel`).
+The `default` user is disabled on Sentinel, and the users in `auth.aclUsers` do not exist there.
+A client therefore needs both credentials: `sentinel` to look up the primary, then its own Valkey user to connect to it.
+
+With `auth.enabled`, Sentinel logs in to the Valkey nodes as `sentinel.monitorUser`, which defaults to `replica.replicationUser` and must be defined in `auth.aclUsers`.
+That user needs these permissions, otherwise failovers abort:
+
+```text
+~* &* +multi +exec +ping +info +role +subscribe +publish +slaveof +replicaof
++config|rewrite +client +failover +script|kill +psync +replconf
+```
+
+**Scheduling:** Sentinel pods take their own `sentinel.affinity`, `sentinel.topologySpreadConstraints`, `sentinel.podLabels` and `sentinel.podAnnotations`; the top level ones apply to Valkey pods only.
+`sentinel.nodeSelector` and `sentinel.tolerations` fall back to the top level values when unset.
+Spread the Sentinels so a single node or zone cannot take down the quorum, and protect them with their own PodDisruptionBudget:
 
 ```yaml
-metrics:
-  enabled: true
-  serviceMonitor:
+sentinel:
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/instance: valkey
+          app.kubernetes.io/component: sentinel
+  podDisruptionBudget:
     enabled: true
+    maxUnavailable: 1
 ```
 
-## PodDisruptionBudget
+**Failover:** a primary that stops responding for `sentinel.downAfterMilliseconds` (5 seconds by default) is replaced within a few seconds.
+Planned restarts (upgrades, node drains) hand over to a replica first without losing acknowledged writes (`sentinel.preStopFailover`, on by default); clients see a brief `-READONLY` or connection error and should retry.
+An unplanned failure can lose the last writes acknowledged by the old primary.
 
-A PodDisruptionBudget helps keep enough read-replicas available during voluntary disruptions like node drains or rolling updates.
+Sentinel can be enabled on an existing replicated release with `helm upgrade`.
 
-**Enable PDB (only works in replicated mode):**
+#### HAProxy Front-End
+
+For clients that do not support Sentinel, HAProxy provides a fixed endpoint that always points at the current primary:
+
+```bash
+helm install valkey valkey/valkey \
+  --set replica.enabled=true \
+  --set persistence.enabled=true \
+  --set persistence.size=5Gi \
+  --set sentinel.enabled=true \
+  --set sentinel.password=change-me \
+  --set haproxy.enabled=true
+```
+
+| Service          | Use                                    |
+|------------------|----------------------------------------|
+| `valkey-haproxy` | Read/write, always the current primary |
+
+Use `valkey-read` for reads.
+After a failover clients get connection errors until HAProxy sees the new primary, up to `sentinel.downAfterMilliseconds` plus `haproxy.config.checkInterval`, and must reconnect.
+
+HAProxy runs 3 pods by default (`haproxy.replicas`), labelled `app.kubernetes.io/name: valkey-haproxy` and `app.kubernetes.io/component: haproxy`.
+Like the Sentinels, they take their own `haproxy.affinity`, `haproxy.topologySpreadConstraints`, `haproxy.podLabels`, `haproxy.podAnnotations`, `haproxy.nodeSelector` and `haproxy.tolerations`, and their own `haproxy.podDisruptionBudget`.
+`haproxy.strategy` sets the Deployment's rollout strategy.
+
+With authentication, HAProxy health checks Valkey as `haproxy.checkUser` (default `default`), which needs `+info` and `+ping`.
+
+**With TLS**, the client's TLS session goes through HAProxy to the Valkey node, so clients connect with TLS as they would to Valkey directly. HAProxy cannot serve non-TLS clients in front of a TLS cluster.
+
+* Add the HAProxy service name, e.g. `valkey-haproxy.<namespace>.svc.cluster.local`, to the server certificate's SANs.
+* With the default `haproxy.tls.verify: required`, the certificate must also cover each pod's DNS name: `valkey-<index>.valkey-headless.<namespace>.svc.cluster.local` and `valkey-sentinel-<index>.valkey-sentinel-hl.<namespace>.svc.cluster.local`.
+  Replace `cluster.local` if you set `clusterDomain`.
+  Alternatively set `haproxy.tls.verify: none` to keep the health checks encrypted without validating the certificate.
+
+With `tls.requireClientCertificate`, HAProxy needs a client certificate signed by `tls.caPublicKey`, with the certificate and key concatenated in one file of `tls.existingSecret`:
+
+```bash
+cat client.crt client.key > client.pem
+kubectl create secret generic valkey-tls \
+  --from-file=ca.crt --from-file=server.crt --from-file=server.key --from-file=client.pem
+```
 
 ```yaml
-podDisruptionBudget:
+tls:
   enabled: true
-  maxUnavailable: 1  # Allow at most 1 pod to be unavailable
+  existingSecret: valkey-tls
+  requireClientCertificate: true
+haproxy:
+  tls:
+    clientCertFile: client.pem
 ```
 
-**Or use minAvailable to guarantee a specific number of replicas:**
+### TLS
 
-```yaml
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 2  # Always keep at least 2 replicas running
+Create a Secret with the server certificate, its key and the CA certificate:
+
+```bash
+kubectl create secret generic valkey-tls-secret \
+  --from-file=server.crt --from-file=server.key --from-file=ca.crt
 ```
-
-## TLS
-
-This chart supports TLS encryption for Valkey connections.
-
-First create a secret containing the certificate public and private keys plus CA public key:
-
-```shell
-kubectl create secret generic valkey-tls-secret --from-file=server.crt --from-file=server.key --from-file=ca.crt
-```
-
-Enable TLS and provide the name of the secret created above:
 
 ```yaml
 tls:
@@ -244,43 +376,186 @@ tls:
   existingSecret: "valkey-tls-secret"
 ```
 
+`tls.serverPublicKey`, `tls.serverKey` and `tls.caPublicKey` set the key names in the Secret.
+For a cert-manager Secret, use `serverPublicKey: tls.crt` and `serverKey: tls.key`.
+
+**Files from another volume:** when the files do not come from a single Secret, set `tls.volume` to any volume source instead.
+For example, to combine a cert-manager certificate without `ca.crt` with a trust-manager CA bundle:
+
+```yaml
+tls:
+  enabled: true
+  volume:
+    projected:
+      sources:
+        - secret:
+            name: valkey-cert
+            items:
+              - {key: tls.crt, path: server.crt}
+              - {key: tls.key, path: server.key}
+        - configMap:
+            name: valkey-ca-bundle
+            items:
+              - {key: trust-bundle.pem, path: ca.crt}
+```
+
+The volume is mounted at `/tls` by the Valkey, Sentinel, HAProxy and test pods:
+
+* It must support being mounted by several pods at once; a ReadWriteOnce PersistentVolumeClaim does not.
+* Every file in it, private keys included, is readable in the Valkey, Sentinel and test pods. HAProxy sees only the CA and its client certificate.
+* The files must be readable by the users those pods run as.
+* Restart HAProxy after rotating the files.
+
+TLS files cannot be mounted through `extraVolumeMounts`; mounts on `/tls` or any other path the chart uses are refused.
+
+### Metrics
+
+Prometheus metrics are exposed by a [Redis exporter](https://github.com/oliver006/redis_exporter) sidecar:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true  # Requires the Prometheus Operator
+```
+
+`metrics.podMonitor` and `metrics.prometheusRule` create a PodMonitor and a PrometheusRule instead of, or next to, the ServiceMonitor.
+
+### PodDisruptionBudget
+
+Available in replicated and Sentinel mode; it covers the Valkey pods only (see [Sentinel](#sentinel) for the Sentinel pods).
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1  # Or minAvailable: 2
+```
+
+### NetworkPolicy
+
+`networkPolicy.enabled` creates a NetworkPolicy for the Valkey pods.
+It does not cover the Sentinel or HAProxy pods, which stay reachable from anywhere.
+By default it admits clients from anywhere on the Valkey port, opens the metrics port when `metrics.enabled` is set, and allows all egress.
+
+To admit only known clients, set `networkPolicy.allowExternal: false`.
+The Valkey port then accepts only:
+
+* pods labelled `valkey-client: "true"` (`<fullname>-client`),
+* the other Valkey pods, and this release's Sentinel and HAProxy pods,
+* pods in namespaces matching `networkPolicy.ingressNSMatchLabels`, narrowed by `networkPolicy.ingressNSPodMatchLabels`.
+
+```yaml
+networkPolicy:
+  enabled: true
+  allowExternal: false
+  ingressNSMatchLabels:
+    kubernetes.io/metadata.name: my-app
+```
+
+`networkPolicy.allowExternalEgress: false` limits egress to DNS, the other Valkey pods and this release's Sentinel pods.
+`networkPolicy.extraIngress` and `networkPolicy.extraEgress` add further rules; they can only widen what the policy allows.
+
+### Custom Configuration
+
+* `extraConfig`: lines appended to `valkey.conf` (templated). `sentinel.extraConfig` does the same for `sentinel.conf`.
+* `extraEnv`: environment variables for the Valkey container (`metrics.exporter.extraEnv` for the exporter).
+* `extraVolumes` / `extraVolumeMounts`: additional volumes for the Valkey container (`metrics.exporter.extraVolumeMounts` for the exporter).
+
+For example, to include configuration from a Secret:
+
+```yaml
+extraVolumes:
+  - name: extra-conf
+    secret:
+      secretName: my-valkey-conf
+extraVolumeMounts:
+  - name: extra-conf
+    mountPath: /extra-conf
+    readOnly: true
+extraConfig: |
+  include /extra-conf/valkey.conf
+```
+
+## Cluster Mode
+
+This chart does not support Valkey cluster mode.
+Use the `valkey-operator` and `valkey-resources` charts in this repository instead.
+
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| global.imageRegistry | string | '' |  |
-| global.imagePullSecrets | list | `[]` |  |
 | affinity | object | `{}` |  |
 | auth.aclConfig | string | `""` |  |
-| auth.aclUsers | object | `{}` | |
+| auth.aclUsers | object | `{}` |  |
 | auth.enabled | bool | `false` |  |
-| auth.usersExistingSecret | string | `""` | |
-| dataStorage.accessModes[0] | string | `"ReadWriteOnce"` |  |
-| dataStorage.annotations | object | `{}` |  |
-| dataStorage.className | string | `""` |  |
-| dataStorage.enabled | bool | `false` |  |
-| dataStorage.keepPvc | bool | `false` |  |
-| dataStorage.labels | object | `{}` |  |
-| dataStorage.persistentVolumeClaimName | string | `""` |  |
-| dataStorage.requestedSize | string | `""` |  |
-| dataStorage.subPath | string | `""` |  |
-| dataStorage.volumeName | string | `"valkey-data"` |  |
-| dataStorage.hostPath | string | `""` |  |
-| deploymentStrategy | string | `"RollingUpdate"` |  |
-| env | object | `{}` |  |
-| extraSecretValkeyConfigs | bool | `false` |  |
-| extraVolumes | list | `[]` |  |
+| auth.usersExistingSecret | string | `""` |  |
+| clusterDomain | string | `"cluster.local"` |  |
+| commonLabels | object | `{}` |  |
+| deploymentStrategy | string | `"Recreate"` |  |
+| extraConfig | string | `""` |  |
+| extraContainers | list | `[]` |  |
+| extraEnv | list | `[]` |  |
+| extraInitContainers | list | `[]` |  |
 | extraVolumeMounts | list | `[]` |  |
-| extraValkeyConfigs | list | `[]` |  |
-| extraValkeySecrets | list | `[]` |  |
+| extraVolumes | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
+| global.imagePullSecrets | list | `[]` |  |
+| global.imageRegistry | string | `""` |  |
+| haproxy.affinity | object | `{}` |  |
+| haproxy.checkUser | string | `""` |  |
+| haproxy.config.checkInterval | string | `"2s"` |  |
+| haproxy.config.checkTimeout | string | `"5s"` |  |
+| haproxy.config.healthPort | int | `8404` |  |
+| haproxy.config.maxconn | int | `4096` |  |
+| haproxy.config.timeout.client | string | `"1m"` |  |
+| haproxy.config.timeout.connect | string | `"5s"` |  |
+| haproxy.config.timeout.server | string | `"1m"` |  |
+| haproxy.config.timeout.tunnel | string | `"24d"` |  |
+| haproxy.enabled | bool | `false` |  |
+| haproxy.extraInitContainers | list | `[]` |  |
+| haproxy.extraVolumeMounts | list | `[]` |  |
+| haproxy.extraVolumes | list | `[]` |  |
+| haproxy.image.pullPolicy | string | `"IfNotPresent"` |  |
+| haproxy.image.registry | string | `"docker.io"` |  |
+| haproxy.image.repository | string | `"haproxy"` |  |
+| haproxy.image.tag | string | `"3.2-alpine"` |  |
+| haproxy.nodeSelector | string | `nil` |  |
+| haproxy.podAnnotations | object | `{}` |  |
+| haproxy.podDisruptionBudget.enabled | bool | `false` |  |
+| haproxy.podDisruptionBudget.maxUnavailable | int | `1` |  |
+| haproxy.podDisruptionBudget.minAvailable | string | `nil` |  |
+| haproxy.podDisruptionBudget.unhealthyPodEvictionPolicy | string | `""` |  |
+| haproxy.podLabels | object | `{}` |  |
+| haproxy.podSecurityContext.fsGroup | int | `99` |  |
+| haproxy.podSecurityContext.runAsGroup | int | `99` |  |
+| haproxy.podSecurityContext.runAsUser | int | `99` |  |
+| haproxy.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
+| haproxy.replicas | int | `3` |  |
+| haproxy.resources | object | `{}` |  |
+| haproxy.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| haproxy.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| haproxy.securityContext.readOnlyRootFilesystem | bool | `true` |  |
+| haproxy.securityContext.runAsNonRoot | bool | `true` |  |
+| haproxy.service.annotations | object | `{}` |  |
+| haproxy.service.clusterIP | string | `""` |  |
+| haproxy.service.loadBalancerClass | string | `""` |  |
+| haproxy.service.loadBalancerSourceRanges | list | `[]` |  |
+| haproxy.service.nodePort | int | `0` |  |
+| haproxy.service.port | int | `6379` |  |
+| haproxy.service.type | string | `"ClusterIP"` |  |
+| haproxy.strategy | object | `{}` |  |
+| haproxy.tls.clientCertFile | string | `""` |  |
+| haproxy.tls.verify | string | `"required"` |  |
+| haproxy.tolerations | string | `nil` |  |
+| haproxy.topologySpreadConstraints | list | `[]` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
-| image.registry | string | `""` |  |
-| image.repository | string | `"docker.io/valkey/valkey"` |  |
+| image.registry | string | `"docker.io"` |  |
+| image.repository | string | `"valkey/valkey"` |  |
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | initResources | object | `{}` |  |
-| livenessProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
+| livenessProbe.customProbe | object | `{}` |  |
 | livenessProbe.enabled | bool | `true` |  |
 | livenessProbe.failureThreshold | int | `3` |  |
 | livenessProbe.initialDelaySeconds | int | `0` |  |
@@ -289,20 +564,24 @@ tls:
 | metrics.enabled | bool | `false` |  |
 | metrics.exporter.args | list | `[]` |  |
 | metrics.exporter.command | list | `[]` |  |
-| metrics.exporter.extraEnvs | object | `{}` |  |
+| metrics.exporter.extraEnv | list | `[]` |  |
 | metrics.exporter.extraVolumeMounts | list | `[]` |  |
 | metrics.exporter.image.pullPolicy | string | `"IfNotPresent"` |  |
-| metrics.exporter.image.repository | string | `"ghcr.io/oliver006/redis_exporter"` |  |
-| metrics.exporter.image.tag | string | `"v1.79.0"` |  |
+| metrics.exporter.image.registry | string | `"ghcr.io"` |  |
+| metrics.exporter.image.repository | string | `"oliver006/redis_exporter"` |  |
+| metrics.exporter.image.tag | string | `"v1.88.0"` |  |
 | metrics.exporter.port | int | `9121` |  |
 | metrics.exporter.resources | object | `{}` |  |
-| metrics.exporter.securityContext | object | `{}` |  |
-| metrics.podMonitor.additionalLabels | object | `{}` |  |
+| metrics.exporter.securityContext.allowPrivilegeEscalation | bool | `false` |  |
+| metrics.exporter.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
+| metrics.exporter.securityContext.readOnlyRootFilesystem | bool | `true` |  |
+| metrics.exporter.securityContext.runAsNonRoot | bool | `true` |  |
+| metrics.exporter.tlsServerName | string | `""` |  |
 | metrics.podMonitor.annotations | object | `{}` |  |
 | metrics.podMonitor.enabled | bool | `false` |  |
-| metrics.podMonitor.extraLabels | object | `{}` |  |
 | metrics.podMonitor.honorLabels | bool | `false` |  |
 | metrics.podMonitor.interval | string | `"30s"` |  |
+| metrics.podMonitor.labels | object | `{}` |  |
 | metrics.podMonitor.metricRelabelings | list | `[]` |  |
 | metrics.podMonitor.podTargetLabels | list | `[]` |  |
 | metrics.podMonitor.port | string | `"metrics"` |  |
@@ -310,22 +589,25 @@ tls:
 | metrics.podMonitor.sampleLimit | bool | `false` |  |
 | metrics.podMonitor.scrapeTimeout | string | `""` |  |
 | metrics.podMonitor.targetLimit | bool | `false` |  |
+| metrics.prometheusRule.annotations | object | `{}` |  |
 | metrics.prometheusRule.enabled | bool | `false` |  |
-| metrics.prometheusRule.extraAnnotations | object | `{}` |  |
-| metrics.prometheusRule.extraLabels | object | `{}` |  |
+| metrics.prometheusRule.labels | object | `{}` |  |
 | metrics.prometheusRule.rules | list | `[]` |  |
 | metrics.service.annotations | object | `{}` |  |
-| metrics.service.enabled | bool | `true` |  |
-| metrics.service.extraLabels | object | `{}` |  |
-| metrics.service.ports.http | int | `9121` |  |
-| metrics.service.type | string | `"ClusterIP"` |  |
 | metrics.service.appProtocol | string | `""` |  |
-| metrics.serviceMonitor.additionalLabels | object | `{}` |  |
+| metrics.service.clusterIP | string | `""` |  |
+| metrics.service.enabled | bool | `true` |  |
+| metrics.service.labels | object | `{}` |  |
+| metrics.service.loadBalancerClass | string | `""` |  |
+| metrics.service.loadBalancerSourceRanges | list | `[]` |  |
+| metrics.service.nodePort | int | `0` |  |
+| metrics.service.port | int | `9121` |  |
+| metrics.service.type | string | `"ClusterIP"` |  |
 | metrics.serviceMonitor.annotations | object | `{}` |  |
 | metrics.serviceMonitor.enabled | bool | `false` |  |
-| metrics.serviceMonitor.extraLabels | object | `{}` |  |
 | metrics.serviceMonitor.honorLabels | bool | `false` |  |
 | metrics.serviceMonitor.interval | string | `"30s"` |  |
+| metrics.serviceMonitor.labels | object | `{}` |  |
 | metrics.serviceMonitor.metricRelabelings | list | `[]` |  |
 | metrics.serviceMonitor.podTargetLabels | list | `[]` |  |
 | metrics.serviceMonitor.port | string | `"metrics"` |  |
@@ -334,66 +616,133 @@ tls:
 | metrics.serviceMonitor.scrapeTimeout | string | `""` |  |
 | metrics.serviceMonitor.targetLimit | bool | `false` |  |
 | nameOverride | string | `""` |  |
-| networkPolicy | object | `{}` |  |
+| networkPolicy.allowExternal | bool | `true` |  |
+| networkPolicy.allowExternalEgress | bool | `true` |  |
+| networkPolicy.annotations | object | `{}` |  |
+| networkPolicy.enabled | bool | `false` |  |
+| networkPolicy.extraEgress | list | `[]` |  |
+| networkPolicy.extraIngress | list | `[]` |  |
+| networkPolicy.ingressNSMatchLabels | object | `{}` |  |
+| networkPolicy.ingressNSPodMatchLabels | object | `{}` |  |
+| networkPolicy.labels | object | `{}` |  |
 | nodeSelector | object | `{}` |  |
+| persistence.accessModes[0] | string | `"ReadWriteOnce"` |  |
+| persistence.annotations | object | `{}` |  |
+| persistence.enabled | bool | `false` |  |
+| persistence.existingClaim | string | `""` |  |
+| persistence.hostPath | string | `""` |  |
+| persistence.keepOnUninstall | bool | `false` |  |
+| persistence.labels | object | `{}` |  |
+| persistence.size | string | `""` |  |
+| persistence.storageClass | string | `""` |  |
+| persistence.subPath | string | `""` |  |
 | podAnnotations | object | `{}` |  |
-| podLabels | object | `{}` |  |
-| commonLabels | object | `{}` |  |
 | podDisruptionBudget.enabled | bool | `false` |  |
-| podDisruptionBudget.minAvailable | int or string | `null` | Minimum pods available during disruptions |
-| podDisruptionBudget.maxUnavailable | int or string | `1` | Maximum pods unavailable during disruptions |
-| podDisruptionBudget.unhealthyPodEvictionPolicy | string | `null` | Policy for evicting unhealthy pods |
+| podDisruptionBudget.maxUnavailable | int | `1` |  |
+| podDisruptionBudget.minAvailable | string | `nil` |  |
+| podDisruptionBudget.unhealthyPodEvictionPolicy | string | `""` |  |
+| podLabels | object | `{}` |  |
 | podSecurityContext.fsGroup | int | `1000` |  |
 | podSecurityContext.runAsGroup | int | `1000` |  |
 | podSecurityContext.runAsUser | int | `1000` |  |
+| podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | priorityClassName | string | `""` |  |
-| runtimeClassName | string | `""` | RuntimeClassName for the pods (e.g. `gvisor`, `kata-containers`); empty uses the cluster default runtime |
-| readinessProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
-| readinessProbe.enabled | bool | `false` | Opt-in; the Valkey container had no readiness probe before |
+| readinessProbe.customProbe | object | `{}` |  |
+| readinessProbe.enabled | bool | `true` |  |
 | readinessProbe.failureThreshold | int | `3` |  |
 | readinessProbe.initialDelaySeconds | int | `0` |  |
 | readinessProbe.periodSeconds | int | `10` |  |
 | readinessProbe.successThreshold | int | `1` |  |
 | readinessProbe.timeoutSeconds | int | `1` |  |
-| replica.enabled | bool | `false` |  |
-| replica.replicas | int | `2` |  |
-| replica.replicationUser | string | `"default"` |  |
 | replica.disklessSync | bool | `false` |  |
-| replica.minReplicasToWrite | int | `0` |  |
+| replica.enabled | bool | `false` |  |
 | replica.minReplicasMaxLag | int | `10` |  |
-| replica.service.enabled | bool | `"true"` |  |
-| replica.service.type | string | `"ClusterIP"` |  |
-| replica.service.port | int | `6379` |  |
+| replica.minReplicasToWrite | int | `0` |  |
+| replica.persistentVolumeClaimRetentionPolicy | object | `{}` |  |
+| replica.replicas | int | `3` |  |
+| replica.replicationUser | string | `"default"` |  |
 | replica.service.annotations | object | `{}` |  |
-| replica.service.nodePort | int | `0` |  |
-| replica.service.clusterIP | string | `""` |  |
 | replica.service.appProtocol | string | `""` |  |
+| replica.service.clusterIP | string | `""` |  |
+| replica.service.enabled | bool | `true` |  |
 | replica.service.loadBalancerClass | string | `""` |  |
-| replica.persistence. |  | `""` |  |
-| replica.persistence.size | string | `""` | Required if replica is enabled |
-| replica.persistence.storageClass | string | `""` |  |
-| replica.persistence.accessModes | list | `""` |  |
+| replica.service.loadBalancerSourceRanges | list | `[]` |  |
+| replica.service.nodePort | int | `0` |  |
+| replica.service.port | int | `6379` |  |
+| replica.service.type | string | `"ClusterIP"` |  |
 | resources | object | `{}` |  |
+| runtimeClassName | string | `""` |  |
+| securityContext.allowPrivilegeEscalation | bool | `false` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | securityContext.runAsNonRoot | bool | `true` |  |
 | securityContext.runAsUser | int | `1000` |  |
+| sentinel.affinity | object | `{}` |  |
+| sentinel.downAfterMilliseconds | int | `5000` |  |
+| sentinel.enabled | bool | `false` |  |
+| sentinel.existingSecret | string | `""` |  |
+| sentinel.extraConfig | string | `""` |  |
+| sentinel.failoverTimeout | int | `60000` |  |
+| sentinel.initialTopologyWaitSeconds | int | `180` |  |
+| sentinel.masterRecordRefreshSeconds | int | `1` |  |
+| sentinel.masterSet | string | `"mymaster"` |  |
+| sentinel.minReadySeconds | int | `15` |  |
+| sentinel.monitorUser | string | `""` |  |
+| sentinel.nodeSelector | string | `nil` |  |
+| sentinel.orphanCheckSeconds | int | `30` |  |
+| sentinel.parallelSyncs | int | `1` |  |
+| sentinel.password | string | `""` |  |
+| sentinel.passwordKey | string | `"sentinel"` |  |
+| sentinel.persistence.accessModes[0] | string | `"ReadWriteOnce"` |  |
+| sentinel.persistence.enabled | bool | `false` |  |
+| sentinel.persistence.size | string | `"100Mi"` |  |
+| sentinel.persistence.storageClass | string | `""` |  |
+| sentinel.persistentVolumeClaimRetentionPolicy | object | `{}` |  |
+| sentinel.podAnnotations | object | `{}` |  |
+| sentinel.podDisruptionBudget.enabled | bool | `false` |  |
+| sentinel.podDisruptionBudget.maxUnavailable | int | `1` |  |
+| sentinel.podDisruptionBudget.minAvailable | string | `nil` |  |
+| sentinel.podDisruptionBudget.unhealthyPodEvictionPolicy | string | `""` |  |
+| sentinel.podLabels | object | `{}` |  |
+| sentinel.port | int | `26379` |  |
+| sentinel.preStopFailover | bool | `true` |  |
+| sentinel.preStopFailoverTimeoutSeconds | int | `20` |  |
+| sentinel.quorum | int | `2` |  |
+| sentinel.replicas | int | `3` |  |
+| sentinel.resources | object | `{}` |  |
+| sentinel.restartFailoverWaitSeconds | int | `120` |  |
+| sentinel.securityContext | object | `{}` |  |
+| sentinel.service.annotations | object | `{}` |  |
+| sentinel.service.appProtocol | string | `""` |  |
+| sentinel.service.clusterIP | string | `""` |  |
+| sentinel.service.enabled | bool | `true` |  |
+| sentinel.service.loadBalancerClass | string | `""` |  |
+| sentinel.service.loadBalancerSourceRanges | list | `[]` |  |
+| sentinel.service.nodePort | int | `0` |  |
+| sentinel.service.port | int | `26379` |  |
+| sentinel.service.type | string | `"ClusterIP"` |  |
+| sentinel.startupTimeoutSeconds | int | `60` |  |
+| sentinel.tolerations | string | `nil` |  |
+| sentinel.topologySpreadConstraints | list | `[]` |  |
 | service.annotations | object | `{}` |  |
+| service.appProtocol | string | `""` |  |
+| service.clusterIP | string | `""` |  |
+| service.loadBalancerClass | string | `""` |  |
+| service.loadBalancerSourceRanges | list | `[]` |  |
 | service.nodePort | int | `0` |  |
 | service.port | int | `6379` |  |
 | service.type | string | `"ClusterIP"` |  |
-| service.appProtocol | string | `""` |  |
-| service.loadBalancerClass | string | `""` |  |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.automount | bool | `false` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
-| startupProbe.customProbe | object | `{}` | Full probe spec to replace the default valkey-cli ping handler and timing |
+| startupProbe.customProbe | object | `{}` |  |
 | startupProbe.enabled | bool | `true` |  |
 | startupProbe.failureThreshold | int | `3` |  |
 | startupProbe.initialDelaySeconds | int | `0` |  |
 | startupProbe.periodSeconds | int | `10` |  |
 | startupProbe.timeoutSeconds | int | `1` |  |
+| terminationGracePeriodSeconds | int | `30` |  |
 | tls.caPublicKey | string | `"ca.crt"` |  |
 | tls.dhParamKey | string | `""` |  |
 | tls.enabled | bool | `false` |  |
@@ -401,8 +750,8 @@ tls:
 | tls.requireClientCertificate | bool | `false` |  |
 | tls.serverKey | string | `"server.key"` |  |
 | tls.serverPublicKey | string | `"server.crt"` |  |
+| tls.volume | object | `{}` |  |
 | tolerations | list | `[]` |  |
 | topologySpreadConstraints | list | `[]` |  |
-| valkeyConfig | string | `""` |  |
 | valkeyLogLevel | string | `"notice"` |  |
 | workloadAnnotations | object | `{}` |  |
