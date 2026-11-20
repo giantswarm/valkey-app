@@ -3,7 +3,7 @@ directories:
 - contents:
   - helmChart:
       appVersion: 9.1.3
-      version: 0.12.1
+      version: 1.0.0
     path: .
   path: helm/valkey/charts/valkey
 kind: LockConfig
